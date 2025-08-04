@@ -166,11 +166,12 @@ function createRings() {
     rings = [];
     walls = [];
     
+    // Create obstacles further ahead of the ball's starting position
     for (let i = 0; i < 10; i++) {
-        createRing(i * 20 - 40);
+        createRing(i * 20 + 30); // Start rings further ahead (z = 30, 50, 70, ...)
         // Create walls at alternating positions
         if (i % 2 === 1) {
-            createWall(i * 20 - 30);
+            createWall(i * 20 + 40); // Start walls further ahead (z = 60, 100, ...)
         }
     }
 }
