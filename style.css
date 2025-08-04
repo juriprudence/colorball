@@ -77,3 +77,85 @@ button:hover {
 #canvas {
     cursor: pointer;
 }
+
+/* Mobile styles */
+@media (max-width: 768px) {
+    #ui {
+        font-size: 20px;
+        top: 10px;
+        left: 10px;
+    }
+    
+    #instructions {
+        font-size: 16px;
+        padding: 15px;
+        width: 80%;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 40%;
+    }
+    
+    #instructions h2 {
+        font-size: 24px;
+        margin: 10px 0;
+    }
+    
+    #instructions p {
+        margin: 8px 0;
+    }
+    
+    #gameOver {
+        font-size: 20px;
+        padding: 20px;
+        width: 80%;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    #gameOver h2 {
+        font-size: 28px;
+        margin: 10px 0;
+    }
+    
+    button {
+        padding: 12px 24px;
+        font-size: 16px;
+        margin: 8px;
+        width: 80%;
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    #ui {
+        font-size: 18px;
+        top: 8px;
+        left: 8px;
+    }
+    
+    #instructions {
+        font-size: 14px;
+        padding: 12px;
+        width: 85%;
+    }
+    
+    #instructions h2 {
+        font-size: 20px;
+    }
+    
+    #gameOver {
+        font-size: 18px;
+        padding: 15px;
+        width: 85%;
+    }
+    
+    #gameOver h2 {
+        font-size: 24px;
+    }
+    
+    button {
+        padding: 10px 20px;
+        font-size: 14px;
+        margin: 6px;
+    }
+}
