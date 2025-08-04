@@ -47,9 +47,15 @@ function init() {
     // Create initial rings
     createRings();
     
-    // Event listeners
-    document.addEventListener('click', onInteraction);
-    document.addEventListener('touchstart', onInteraction);
+    // Event listeners for drag controls
+    const canvas = document.getElementById('canvas');
+    canvas.addEventListener('mousedown', onDragStart);
+    canvas.addEventListener('mousemove', onDragMove);
+    canvas.addEventListener('mouseup', onDragEnd);
+    canvas.addEventListener('mouseleave', onDragEnd);
+    canvas.addEventListener('touchstart', onDragStart);
+    canvas.addEventListener('touchmove', onDragMove);
+    canvas.addEventListener('touchend', onDragEnd);
     window.addEventListener('resize', onWindowResize);
     
     // Create background sphere
