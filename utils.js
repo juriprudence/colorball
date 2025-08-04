@@ -2,9 +2,13 @@
 
 // Drag control variables
 let isDragging = false;
+let dragStartX = 0;
 let dragStartY = 0;
-let dragDistance = 0;
+let dragDistanceX = 0;
+let dragDistanceY = 0;
 let dragSpeed = 0;
+let lastColorChangeTime = 0;
+const colorChangeCooldown = 300; // 300ms cooldown between color changes
 
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -19,15 +23,18 @@ function onDragStart(event) {
     event.preventDefault();
     isDragging = true;
     
-    // Get the starting Y position of the drag
+    // Get the starting positions of the drag
     if (event.touches) {
+        dragStartX = event.touches[0].clientX;
         dragStartY = event.touches[0].clientY;
     } else {
+        dragStartX = event.clientX;
         dragStartY = event.clientY;
     }
     
-    // Reset drag distance
-    dragDistance = 0;
+    // Reset drag distances
+    dragDistanceX = 0;
+    dragDistanceY = 0;
 }
 
 function onDragMove(event) {
@@ -35,20 +42,30 @@ function onDragMove(event) {
     
     event.preventDefault();
     
-    // Calculate the drag distance
-    let currentY;
+    // Get current positions
+    let currentX, currentY;
     if (event.touches) {
+        currentX = event.touches[0].clientX;
         currentY = event.touches[0].clientY;
     } else {
+        currentX = event.clientX;
         currentY = event.clientY;
     }
     
-    // Calculate drag distance (negative because dragging up should increase speed)
-    dragDistance = dragStartY - currentY;
+    // Calculate drag distances
+    dragDistanceX = currentX - dragStartX;
+    dragDistanceY = dragStartY - currentY; // Negative because dragging up should increase speed
     
-    // Update drag speed based on drag distance
+    // Change ball color if dragging left (more than 30 pixels)
+    const currentTime = Date.now();
+    if (dragDistanceX < -30 && (currentTime - lastColorChangeTime) > colorChangeCooldown) {
+        changeBallColor();
+        lastColorChangeTime = currentTime;
+    }
+    
+    // Update drag speed based on vertical drag distance
     // Scale the drag distance to a reasonable speed value
-    dragSpeed = Math.min(Math.max(dragDistance * 0.01, 0), maxSpeed);
+    dragSpeed = Math.min(Math.max(dragDistanceY * 0.01, 0), maxSpeed);
 }
 
 function onDragEnd(event) {
