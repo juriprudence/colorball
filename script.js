@@ -1,18 +1,18 @@
-
 // Game variables
-let scene, camera, renderer, ball, rings = [], walls = [], gameStarted = false, gameOver = false;
+let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], gameStarted = false, gameOver = false;
 let ballColor = 0xff0000, score = 0, ballSpeed = 0, maxSpeed = 0.3;
 let cameraOffset = new THREE.Vector3(0, 5, 10);
+let stars = [];
 
 // Color palette
 const colors = [0xff0000, 0x00ff00, 0xffff00, 0x0000FF]; // red, green, yellow, dark red
-const colorNames = ['red', 'green', 'yellow', 'dark red'];
+const colorNames = ['red', 'green', 'yellow', 'bleu'];
 
 // Initialize the game
 function init() {
     // Create scene
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x667eea, 50, 200);
+    scene.fog = new THREE.Fog(0x000011, 50, 200);
     
     // Create camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -20,48 +20,118 @@ function init() {
     // Create renderer
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x667eea);
+    renderer.setClearColor(0x000011); // Dark space color
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
     scene.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
     scene.add(directionalLight);
     
+    // Create starfield
+    createStarfield();
+    
+    // Create infinite table (ground)
+    createGroundPlanes();
+
     // Create ball
     createBall();
-    
+
     // Create initial rings
     createRings();
+function createGroundPlanes() {
+    // Remove old planes if any
+    groundPlanes.forEach(plane => scene.remove(plane));
+    groundPlanes = [];
+    // Create several large planes tiled along z to simulate infinity
+    const planeWidth = 30;
+    const planeHeight = 60;
+    const numPlanes = 5;
+    for (let i = 0; i < numPlanes; i++) {
+        const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
+        const material = new THREE.MeshPhongMaterial({ color: 0x222288, side: THREE.DoubleSide });
+        const plane = new THREE.Mesh(geometry, material);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.set(0, -0.5, -i * planeHeight);
+        plane.receiveShadow = true;
+        scene.add(plane);
+        groundPlanes.push(plane);
+    }
+}
     
     // Event listeners
     document.addEventListener('click', onInteraction);
     document.addEventListener('touchstart', onInteraction);
     window.addEventListener('resize', onWindowResize);
     
+    // Create background sphere
+    createBackgroundSphere();
+    
     // Start render loop
     animate();
 }
 
+function createStarfield() {
+    const starGeometry = new THREE.BufferGeometry();
+    const starMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 2,
+        sizeAttenuation: false
+    });
+    
+    const starVertices = [];
+    for (let i = 0; i < 1000; i++) {
+        const x = (Math.random() - 0.5) * 2000;
+        const y = (Math.random() - 0.5) * 2000;
+        const z = (Math.random() - 0.5) * 2000;
+        starVertices.push(x, y, z);
+    }
+    
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+    const starField = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starField);
+    stars.push(starField);
+}
+
 function createBall() {
     const ballGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-    const ballMaterial = new THREE.MeshLambertMaterial({ color: ballColor });
+    const ballMaterial = new THREE.MeshLambertMaterial({ 
+        color: ballColor,
+        emissive: ballColor,
+        emissiveIntensity: 0.2
+    });
     ball = new THREE.Mesh(ballGeometry, ballMaterial);
     ball.position.set(0, 0, 0);
     ball.castShadow = true;
     scene.add(ball);
 }
 
+function createBackgroundSphere() {
+    const sphereGeometry = new THREE.SphereGeometry(50, 32, 32);
+    const sphereMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000022,
+        transparent: true,
+        opacity: 0.05,
+        side: THREE.BackSide
+    });
+    backgroundSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    scene.add(backgroundSphere);
+}
+
 function createRings() {
+    // Clear existing rings and walls
+    rings.forEach(ring => scene.remove(ring));
+    walls.forEach(wall => scene.remove(wall));
     rings = [];
     walls = [];
+    
     for (let i = 0; i < 10; i++) {
         createRing(i * 20 - 40);
         // Create walls at alternating positions
@@ -79,7 +149,11 @@ function createRing(zPosition) {
     // Create 4 colored segments
     for (let i = 0; i < 4; i++) {
         const segmentGeometry = new THREE.TorusGeometry(radius, tube, 16, 16, Math.PI / 2);
-        const segmentMaterial = new THREE.MeshLambertMaterial({ color: colors[i] });
+        const segmentMaterial = new THREE.MeshLambertMaterial({ 
+            color: colors[i],
+            emissive: colors[i],
+            emissiveIntensity: 0.1
+        });
         const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
         
         // Rotate each segment to create quarters
@@ -107,7 +181,11 @@ function createWall(zPosition) {
     // Create 4 colored segments (vertical arrangement)
     for (let i = 0; i < 4; i++) {
         const segmentGeometry = new THREE.BoxGeometry(wallWidth, segmentHeight, 0.5);
-        const segmentMaterial = new THREE.MeshLambertMaterial({ color: colors[i] });
+        const segmentMaterial = new THREE.MeshLambertMaterial({ 
+            color: colors[i],
+            emissive: colors[i],
+            emissiveIntensity: 0.1
+        });
         const segment = new THREE.Mesh(segmentGeometry, segmentMaterial);
         // Position segments vertically (raise wall higher)
         segment.position.y = (i - 1.5) * segmentHeight + 6; // Shifted up by 6 units
@@ -137,8 +215,11 @@ function onInteraction(event) {
 }
 
 function startGame() {
-    window.startGame = startGame;
+    // Hide instructions and game over screens
     document.getElementById('instructions').style.display = 'none';
+    document.getElementById('gameOver').style.display = 'none';
+    
+    // Reset game state
     gameStarted = true;
     gameOver = false;
     score = 0;
@@ -152,18 +233,13 @@ function startGame() {
     camera.position.set(0, 5, 10);
     camera.lookAt(ball.position);
     
+    // Create fresh rings and walls
+    createRings();
+    
     updateScore();
 }
 
 function restartGame() {
-    window.restartGame = restartGame;
-    document.getElementById('gameOver').style.display = 'none';
-    
-    // Reset rings and walls
-    rings.forEach(ring => scene.remove(ring));
-    walls.forEach(wall => scene.remove(wall));
-    createRings();
-    
     startGame();
 }
 
@@ -171,6 +247,7 @@ function changeBallColor() {
     const randomIndex = Math.floor(Math.random() * colors.length);
     ballColor = colors[randomIndex];
     ball.material.color.setHex(ballColor);
+    ball.material.emissive.setHex(ballColor);
 }
 
 function checkCollisions() {
@@ -291,12 +368,25 @@ function animate() {
             ballSpeed *= 0.92; // Increased friction for faster stop
             if (ballSpeed < 0.01) ballSpeed = 0; // Stop completely when very slow
         }
-        
+
+        // Move ground planes to simulate infinite table
+        const planeHeight = 60;
+        groundPlanes.forEach(plane => {
+            // If plane is too far behind the ball, move it ahead
+            if (plane.position.z - ball.position.z > planeHeight * 2) {
+                plane.position.z -= planeHeight * groundPlanes.length;
+            }
+            // If plane is too far ahead, move it behind
+            if (ball.position.z - plane.position.z > planeHeight * 2) {
+                plane.position.z += planeHeight * groundPlanes.length;
+            }
+        });
+
         // Rotate rings
         rings.forEach(ring => {
             ring.rotation.z += ring.rotationSpeed;
         });
-        
+
         // Rotate wall colors (slower)
         walls.forEach(wall => {
             wall.children.forEach((segment, index) => {
@@ -305,25 +395,36 @@ function animate() {
                 const colorOffset = Math.floor(time * 0.3) % 4; // Much slower color change
                 const newColorIndex = (segment.originalColorIndex + colorOffset) % 4;
                 segment.material.color.setHex(colors[newColorIndex]);
+                segment.material.emissive.setHex(colors[newColorIndex]);
                 segment.currentColorIndex = newColorIndex;
             });
         });
-        
+
         // Update camera to follow ball
         const targetCameraPosition = ball.position.clone().add(cameraOffset);
         camera.position.lerp(targetCameraPosition, 0.1);
         camera.lookAt(ball.position);
-        
+
+        // Update background sphere to follow ball
+        if (backgroundSphere) {
+            backgroundSphere.position.copy(ball.position);
+        }
+
+        // Animate starfield
+        stars.forEach(starField => {
+            starField.position.z = ball.position.z;
+        });
+
         // Check collisions
         checkCollisions();
         checkWallCollisions();
-        
+
         // Remove rings that are too far behind
         rings.forEach((ring, index) => {
             if (ring.position.z > ball.position.z + 20) {
                 scene.remove(ring);
                 rings.splice(index, 1);
-                
+
                 // Add new ring ahead
                 const allZPositions = [
                     ...rings.map(r => r.position.z),
@@ -343,6 +444,10 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
+// Make functions globally accessible
+window.startGame = startGame;
+window.restartGame = restartGame;
 
 // Initialize the game
 init();
