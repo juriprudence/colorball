@@ -97,10 +97,18 @@ function checkCollisions() {
 
             if (ballColor === segmentColor) {
                 ring.hasPassed = true;
-                scene.remove(ring);
-                rings.splice(ringIndex, 1);
-                const furthestZ = Math.min(...rings.map(r => r.position.z)) - 20;
-                createRing(furthestZ);
+                // Use destruction effect instead of directly removing
+                destroyRing(ring);
+                // Remove ring after a short delay to allow animation to play
+                setTimeout(() => {
+                    scene.remove(ring);
+                    const ringIndex = rings.indexOf(ring);
+                    if (ringIndex !== -1) {
+                        rings.splice(ringIndex, 1);
+                        const furthestZ = Math.min(...rings.map(r => r.position.z)) - 20;
+                        createRing(furthestZ);
+                    }
+                }, 500); // Delay matches animation duration
                 score += 10;
                 // Only change ball color automatically if player doesn't have a pickup
                 if (!hasColorPickup) {
@@ -136,15 +144,22 @@ function checkWallCollisions() {
                 if (ballColor === segmentColor) {
                     if (!wall.hasPassed) {
                         wall.hasPassed = true;
+                        // Use destruction effect instead of directly removing
+                        destroyWall(wall);
+                        // Remove wall after a short delay to allow animation to play
+                        setTimeout(() => {
+                            const wallIndex = walls.indexOf(wall);
+                            if (wallIndex !== -1) {
+                                scene.remove(wall);
+                                walls.splice(wallIndex, 1);
+                            }
+                        }, 600); // Delay matches animation duration
                         score += 15;
                         updateScore();
                         // Only change ball color automatically if player doesn't have a pickup
                         if (!hasColorPickup) {
                             changeBallColor();
                         }
-                        // Hide the wall after passing
-                        scene.remove(wall);
-                        walls.splice(wallIndex, 1);
                     }
                 } else {
                     if (!wall.hasPassed) {
