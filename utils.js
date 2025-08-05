@@ -103,8 +103,8 @@ function onDragMove(event) {
         }
     }
     
-    // If player has a color pickup, allow color changing through horizontal drag
-    if (hasColorPickup) {
+    // Allow color changing through horizontal drag
+    if (availableColors.length > 1) {
         const currentTime = Date.now();
         // Change selected color when dragging horizontally more than 20 pixels
         // and more horizontally than vertically
@@ -113,19 +113,19 @@ function onDragMove(event) {
             // Determine direction of drag
             if (dragDistanceX > 0) {
                 // Dragging right - cycle to next color
-                selectedColorIndex = (selectedColorIndex + 1) % colors.length;
+                selectedColorIndex = (selectedColorIndex + 1) % availableColors.length;
             } else {
                 // Dragging left - cycle to previous color
-                selectedColorIndex = (selectedColorIndex - 1 + colors.length) % colors.length;
+                selectedColorIndex = (selectedColorIndex - 1 + availableColors.length) % availableColors.length;
             }
             
             // Update the ball color immediately
-            ballColor = colors[selectedColorIndex];
+            ballColor = availableColors[selectedColorIndex];
             ball.material.color.setHex(ballColor);
             ball.material.emissive.setHex(ballColor);
             
             // Update UI to show selected color
-            updateColorPickupUI();
+            updateAvailableColorsUI();
             
             lastColorChangeTime = currentTime;
         }
@@ -159,8 +159,8 @@ function onDragEnd(event) {
 }
 
 function changeBallColor() {
-    const randomIndex = Math.floor(Math.random() * colors.length);
-    ballColor = colors[randomIndex];
+    const randomIndex = Math.floor(Math.random() * availableColors.length);
+    ballColor = availableColors[randomIndex];
     ball.material.color.setHex(ballColor);
     ball.material.emissive.setHex(ballColor);
 }

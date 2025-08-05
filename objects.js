@@ -100,20 +100,14 @@ function createGroundPlanes() {
 }
 
 function createRings() {
-    // Clear existing rings, walls, pickups, and ground obstacles
+    // Clear existing rings, walls, and ground obstacles
     rings.forEach(ring => scene.remove(ring));
     walls.forEach(wall => scene.remove(wall));
-    pickups.forEach(pickup => scene.remove(pickup));
     groundObstacles.forEach(obstacle => scene.remove(obstacle));
     rings = [];
     walls = [];
-    pickups = [];
     groundObstacles = [];
     
-    // Always create a pickup at the start (z=0.5)
-    createPickup(0.5);
-    // Mark that colors are not available until pickup is collected
-    if (typeof window.colorsAvailable === 'undefined') window.colorsAvailable = false;
     // Create obstacles further ahead of the ball's starting position
     for (let i = 0; i < 10; i++) {
         createRing(i * 20 + 30); // Start rings further ahead (z = 30, 50, 70, ...)
@@ -125,10 +119,6 @@ function createRings() {
         if (i % 4 === 0) {
             const obstacle = createGroundObstacle(i * 20 + 32); // Position obstacles between rings and walls
             groundObstacles.push(obstacle);
-        }
-        // Create pickups at regular intervals
-        if (i % 3 === 0) {
-            createPickup(i * 20 + 35); // Position pickups between rings and walls
         }
     }
 }
@@ -196,35 +186,6 @@ function createWall(zPosition) {
     walls.push(wallGroup);
 }
 
-function createPickup(zPosition) {
-    const pickupGeometry = new THREE.SphereGeometry(0.8, 32, 32); // Made larger for visibility
-    
-    // Fixed material - use proper color for emissive
-    const colorIndex = Math.floor(Math.random() * colors.length);
-    const pickupMaterial = new THREE.MeshLambertMaterial({
-        color: colors[colorIndex],
-        emissive: colors[colorIndex], // Use the same color as emissive instead of white
-        emissiveIntensity: 0.3 // Reduced intensity so color is visible
-    });
-    const pickup = new THREE.Mesh(pickupGeometry, pickupMaterial);
-    
-    // Position the pickup higher so it's more visible
-    pickup.position.set(0, 1, zPosition); // Raised from y=0 to y=1
-    pickup.castShadow = true;
-    pickup.receiveShadow = true;
-    
-    // Add animation data
-    pickup.userData = {
-        originalScale: 1,
-        pulseSpeed: 0.05,
-        rotationSpeed: 0.02
-    };
-    
-    scene.add(pickup);
-    pickups.push(pickup);
-    
-    return pickup;
-}
 
 function createGroundObstacle(zPosition) {
     // Create a rectangle obstacle on the ground
@@ -264,21 +225,6 @@ function createGroundObstacle(zPosition) {
     return obstacleGroup;
 }
 
-// Animation function for pickups to make them more visible
-function animatePickups() {
-    pickups.forEach(pickup => {
-        if (pickup.userData) {
-            // Pulse the pickup size
-            const time = Date.now() * pickup.userData.pulseSpeed;
-            const scale = pickup.userData.originalScale + Math.sin(time) * 0.2;
-            pickup.scale.set(scale, scale, scale);
-            
-            // Rotate the pickup for extra visibility
-            pickup.rotation.y += pickup.userData.rotationSpeed;
-            pickup.rotation.x += pickup.userData.rotationSpeed * 0.5;
-        }
-    });
-}
 
 // Make functions globally accessible
 window.createGroundObstacle = createGroundObstacle;
@@ -375,7 +321,6 @@ function destroyBall() {
 
 // Make function globally accessible
 window.destroyBall = destroyBall;
-window.animatePickups = animatePickups;
 
 // Ring destruction effect function
 function destroyRing(ring) {
@@ -574,3 +519,17 @@ function destroyWall(wall) {
 // Make functions globally accessible
 window.destroyRing = destroyRing;
 window.destroyWall = destroyWall;
+function createChaser() {
+    const chaserGeometry = new THREE.BoxGeometry(5, 5, 1);
+    const chaserColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+    const chaserMaterial = new THREE.MeshLambertMaterial({
+        color: chaserColor,
+        emissive: chaserColor,
+        emissiveIntensity: 0.5
+    });
+    const chaser = new THREE.Mesh(chaserGeometry, chaserMaterial);
+    chaser.position.set(ball.position.x, ball.position.y, ball.position.z + 50);
+    chaser.color = chaserColor;
+    scene.add(chaser);
+    return chaser;
+}

@@ -1,13 +1,14 @@
 // Game variables
-let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], pickups = [], groundObstacles = [], gameStarted = false, gameOver = false;
-let ballColor = 0xff0000, score = 0, ballSpeed = 0, maxSpeed = 0.3;
+let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], groundObstacles = [], chaser = null, gameStarted = false, gameOver = false;
+let ballColor = 0xff0000, score = 0, ballSpeed = 0, maxSpeed = 0.3, obstaclesPassed = 0;
 let cameraOffset = new THREE.Vector3(0, 5, 10);
 let stars = [];
-let hasColorPickup = false; // Track if player has collected a color pickup
 let selectedColorIndex = 0; // Track the currently selected color
+let lastChaserTime = 0;
 
 // Color palette
 const colors = [0xff0000, 0x00ff00, 0xffff00, 0x0000FF]; // red, green, yellow, dark red
+let availableColors = [colors[0]];
 const colorNames = ['red', 'green', 'yellow', 'bleu'];
 
 // Initialize the game
@@ -110,10 +111,9 @@ function checkCollisions() {
                     }
                 }, 500); // Delay matches animation duration
                 score += 10;
-                // Only change ball color automatically if player doesn't have a pickup
-                if (!hasColorPickup) {
-                    changeBallColor();
-                }
+                obstaclesPassed++;
+                updateAvailableColors();
+                changeBallColor();
                 updateScore();
                 maxSpeed = Math.min(maxSpeed + 0.02, 1.2);
             } else {
@@ -156,10 +156,9 @@ function checkWallCollisions() {
                         }, 600); // Delay matches animation duration
                         score += 15;
                         updateScore();
-                        // Only change ball color automatically if player doesn't have a pickup
-                        if (!hasColorPickup) {
-                            changeBallColor();
-                        }
+                        obstaclesPassed++;
+                        updateAvailableColors();
+                        changeBallColor();
                     }
                 } else {
                     if (!wall.hasPassed) {
@@ -190,31 +189,6 @@ function checkWallCollisions() {
     });
 }
 
-function checkPickupCollisions() {
-    const ballPosition = ball.position;
-    
-    pickups.forEach((pickup, pickupIndex) => {
-        const pickupPosition = pickup.position;
-        const distance = ballPosition.distanceTo(pickupPosition);
-        
-        // Check if ball collides with pickup
-        if (distance < 1.5) {
-            // Remove pickup
-            scene.remove(pickup);
-            pickups.splice(pickupIndex, 1);
-            
-            // Player now has a color pickup
-            hasColorPickup = true;
-            
-            // Update UI to show available colors
-            updateColorPickupUI();
-            
-            // Add score for collecting pickup
-            score += 5;
-            updateScore();
-        }
-    });
-}
 
 function checkGroundObstacleCollisions() {
     const ballPosition = ball.position;
@@ -231,10 +205,9 @@ function checkGroundObstacleCollisions() {
                         obstacle.hasPassed = true;
                         score += 20; // More points for ground obstacles
                         updateScore();
-                        // Only change ball color automatically if player doesn't have a pickup
-                        if (!hasColorPickup) {
-                            changeBallColor();
-                        }
+                        obstaclesPassed++;
+                        updateAvailableColors();
+                        changeBallColor();
                     }
                 } else {
                     // If colors don't match, end the game
@@ -270,20 +243,65 @@ function checkGroundObstacleCollisions() {
     });
 }
 
-function updateColorPickupUI() {
+function updateAvailableColors() {
+    const newColorIndex = Math.floor(obstaclesPassed / 2);
+    if (newColorIndex < colors.length && !availableColors.includes(colors[newColorIndex])) {
+        availableColors.push(colors[newColorIndex]);
+        updateAvailableColorsUI();
+    }
+}
+
+function updateAvailableColorsUI() {
     const uiElement = document.getElementById('ui');
-    if (hasColorPickup) {
-        // Show available colors with selected color highlighted
-        let colorElements = '<div>Available Colors:</div>';
-        colors.forEach((color, index) => {
+    let colorElements = '';
+    if (availableColors.length > 1) {
+        colorElements = '<div>Available Colors:</div>';
+        availableColors.forEach((color, index) => {
             const isSelected = index === selectedColorIndex;
             const borderStyle = isSelected ? 'border: 2px solid yellow;' : 'border: 2px solid white;';
             colorElements += `<div class="color-option" style="background-color: #${color.toString(16).padStart(6, '0')}; ${borderStyle}"></div>`;
         });
-        uiElement.innerHTML = `<div>Score: <span id="score">${score}</span></div>${colorElements}`;
-    } else {
-        // Show just the score
-        uiElement.innerHTML = `<div>Score: <span id="score">${score}</span></div>`;
+    }
+    uiElement.innerHTML = `<div>Score: <span id="score">${score}</span></div>${colorElements}`;
+}
+
+function checkChaserCollision() {
+    if (!chaser) return;
+
+    const distance = ball.position.distanceTo(chaser.position);
+    if (distance < 2.5) {
+        const chaserColorIndex = availableColors.indexOf(chaser.color);
+
+        // If the player has the chaser's color in their palette
+        if (chaserColorIndex !== -1) {
+            // If it's not the last color, remove it
+            if (availableColors.length > 1) {
+                const removedColor = availableColors.splice(chaserColorIndex, 1)[0];
+                
+                // If the ball's current color was the one that was removed,
+                // we must change the ball's color to a new one.
+                if (ballColor === removedColor) {
+                    // Reset selected index to a valid one before changing color
+                    if (selectedColorIndex >= availableColors.length) {
+                        selectedColorIndex = 0; // default to the first color
+                    }
+                    ballColor = availableColors[selectedColorIndex];
+                    ball.material.color.setHex(ballColor);
+                    ball.material.emissive.setHex(ballColor);
+                }
+            }
+            
+            // Player survives
+            scene.remove(chaser);
+            chaser = null;
+            score += 50;
+            updateScore();
+            updateAvailableColorsUI();
+
+        } else {
+            // Player does not have the color, game over
+            destroyBall();
+        }
     }
 }
 
@@ -329,14 +347,9 @@ function animate() {
             });
         });
 
-        // Rotate pickups
-        pickups.forEach(pickup => {
-            pickup.rotation.y += 0.05;
-            
-            // Add pulsing effect
-            const scale = 1 + 0.1 * Math.sin(Date.now() * 0.005);
-            pickup.scale.set(scale, scale, scale);
-        });
+        if (chaser) {
+            chaser.position.z -= 0.1;
+        }
         
         // Animate ground obstacles color changes
         groundObstacles.forEach(obstacle => {
@@ -368,8 +381,8 @@ function animate() {
         // Check collisions
         checkCollisions();
         checkWallCollisions();
-        checkPickupCollisions();
         checkGroundObstacleCollisions();
+        checkChaserCollision();
 
         // Remove rings that are too far behind
         rings.forEach((ring, index) => {
@@ -386,14 +399,12 @@ function animate() {
                 createRing(furthestZ);
             }
         });
-        
-        // Remove pickups that are too far behind
-        pickups.forEach((pickup, index) => {
-            if (pickup.position.z > ball.position.z + 20) {
-                scene.remove(pickup);
-                pickups.splice(index, 1);
-            }
-        });
+
+        const currentTime = Date.now();
+        if (gameStarted && !gameOver && availableColors.length > 1 && !chaser && (currentTime - lastChaserTime) > 10000) {
+            chaser = createChaser();
+            lastChaserTime = currentTime;
+        }
     }
     
     renderer.render(scene, camera);
@@ -409,8 +420,13 @@ function startGame() {
     gameOver = false;
     score = 0;
     ballSpeed = 0;
-    hasColorPickup = false; // Reset color pickup
     selectedColorIndex = 0; // Reset selected color
+    obstaclesPassed = 0;
+    availableColors = [colors[0]];
+    if (chaser) {
+        scene.remove(chaser);
+        chaser = null;
+    }
     
     // Reset ball position and color
     ball.position.set(0, 0, 0);
@@ -425,8 +441,7 @@ function startGame() {
     createRings();
     
     // Update UI
-    updateColorPickupUI();
-    updateScore();
+    updateAvailableColorsUI();
 }
 
 function restartGame() {
@@ -457,6 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Make functions globally accessible
 window.startGame = startGame;
 window.restartGame = restartGame;
+window.updateAvailableColorsUI = updateAvailableColorsUI;
 
 // Initialize the game
 init();
