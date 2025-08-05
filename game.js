@@ -1,5 +1,5 @@
 // Game variables
-let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], groundObstacles = [], chaser = null, gameStarted = false, gameOver = false;
+let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], groundObstacles = [], floorTunnels = [], chaser = null, gameStarted = false, gameOver = false;
 let ballColor = 0xff0000, score = 0, ballSpeed = 0, maxSpeed = 0.3, obstaclesPassed = 0;
 let cameraOffset = new THREE.Vector3(0, 5, 10);
 let stars = [];
@@ -243,6 +243,51 @@ function checkGroundObstacleCollisions() {
     });
 }
 
+function checkFloorTunnelCollisions() {
+    const ballPosition = ball.position;
+    floorTunnels.forEach((tunnel, index) => {
+        const tunnelPosition = tunnel.position;
+        const tunnelLength = 10;
+        const tunnelWidth = 5;
+        const tunnelHeight = 3;
+
+        if (ballPosition.z > tunnelPosition.z - tunnelLength / 2 && ballPosition.z < tunnelPosition.z + tunnelLength / 2) {
+            if (
+                ballPosition.x > tunnelPosition.x - tunnelWidth / 2 &&
+                ballPosition.x < tunnelPosition.x + tunnelWidth / 2 &&
+                ballPosition.y > tunnelPosition.y - 0.5 &&
+                ballPosition.y < tunnelPosition.y + tunnelHeight - 0.5
+            ) {
+                if (ballColor === colors[tunnel.colorIndex]) {
+                    if (!tunnel.hasPassed) {
+                        tunnel.hasPassed = true;
+                        score += 25;
+                        updateScore();
+                        obstaclesPassed++;
+                        updateAvailableColors();
+                        changeBallColor();
+                    }
+                } else {
+                    if (!tunnel.hasPassed) {
+                        tunnel.hasPassed = true;
+                        destroyBall();
+                    }
+                }
+            } else {
+                if (!tunnel.hasPassed) {
+                    tunnel.hasPassed = true;
+                    destroyBall();
+                }
+            }
+        }
+
+        if (tunnel.position.z > ball.position.z + 20) {
+            scene.remove(tunnel);
+            floorTunnels.splice(index, 1);
+        }
+    });
+}
+
 function updateAvailableColors() {
     const newColorIndex = Math.floor(obstaclesPassed / 2);
     if (newColorIndex < colors.length && !availableColors.includes(colors[newColorIndex])) {
@@ -339,7 +384,7 @@ function animate() {
             wall.children.forEach((segment, index) => {
                 // Calculate new color index based on rotation
                 const time = Date.now() * 0.001;
-                const colorOffset = Math.floor(time * 0.3) % 4; // Much slower color change
+                const colorOffset = Math.floor(time * 1.2) % 4; // Adjusted speed
                 const newColorIndex = (segment.originalColorIndex + colorOffset) % 4;
                 segment.material.color.setHex(colors[newColorIndex]);
                 segment.material.emissive.setHex(colors[newColorIndex]);
@@ -382,6 +427,7 @@ function animate() {
         checkCollisions();
         checkWallCollisions();
         checkGroundObstacleCollisions();
+        checkFloorTunnelCollisions();
         checkChaserCollision();
 
         // Remove rings that are too far behind

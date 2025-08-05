@@ -104,9 +104,13 @@ function createRings() {
     rings.forEach(ring => scene.remove(ring));
     walls.forEach(wall => scene.remove(wall));
     groundObstacles.forEach(obstacle => scene.remove(obstacle));
+    if (typeof floorTunnels !== 'undefined') {
+        floorTunnels.forEach(tunnel => scene.remove(tunnel));
+    }
     rings = [];
     walls = [];
     groundObstacles = [];
+    floorTunnels = [];
     
     // Create obstacles further ahead of the ball's starting position
     for (let i = 0; i < 10; i++) {
@@ -119,6 +123,11 @@ function createRings() {
         if (i % 4 === 0) {
             const obstacle = createGroundObstacle(i * 20 + 32); // Position obstacles between rings and walls
             groundObstacles.push(obstacle);
+        }
+        // Create floor tunnels
+        if (i > 0 && i % 3 === 0) {
+            const tunnel = createFloorTunnel(i * 20 + 50);
+            floorTunnels.push(tunnel);
         }
     }
 }
@@ -147,7 +156,7 @@ function createRing(zPosition) {
     }
     
     ringGroup.position.set(2, 3, zPosition); // Move right by 2 units, up by 3 units, and keep z position
-    ringGroup.rotationSpeed = (Math.random() - 0.5) * 0.08; // Increased speed
+    ringGroup.rotationSpeed = (Math.random() * 0.04 + 0.01) * (Math.random() < 0.5 ? 1 : -1); // Adjusted speed
     ringGroup.hasPassed = false; // Initialize hasPassed property
     
     scene.add(ringGroup);
@@ -218,6 +227,7 @@ function createGroundObstacle(zPosition) {
     obstacleGroup.currentColorIndex = 0; // Track current color index
     obstacleGroup.hasPassed = false; // Track if player has passed this obstacle
     obstacleGroup.isChangingColor = false; // Track if color is currently changing
+    obstacleGroup.rotationSpeed = 0.005;
     
     // Add the group to the scene
     scene.add(obstacleGroup);
@@ -226,8 +236,56 @@ function createGroundObstacle(zPosition) {
 }
 
 
+function createFloorTunnel(zPosition) {
+    const tunnelGroup = new THREE.Group();
+    const tunnelLength = 10;
+    const tunnelWidth = 5;
+    const tunnelHeight = 3;
+    const wallThickness = 0.5;
+
+    const wallGeometry = new THREE.BoxGeometry(wallThickness, tunnelHeight, tunnelLength);
+    const roofGeometry = new THREE.BoxGeometry(tunnelWidth, wallThickness, tunnelLength);
+
+    const tunnelColorIndex = Math.floor(Math.random() * 4);
+    const tunnelMaterial = new THREE.MeshLambertMaterial({
+        color: colors[tunnelColorIndex],
+        emissive: colors[tunnelColorIndex],
+        emissiveIntensity: 0.1
+    });
+
+    // Left wall
+    const leftWall = new THREE.Mesh(wallGeometry, tunnelMaterial);
+    leftWall.position.set(-tunnelWidth / 2 + wallThickness / 2, tunnelHeight / 2 - 0.5, 0);
+    leftWall.castShadow = true;
+    leftWall.receiveShadow = true;
+    tunnelGroup.add(leftWall);
+
+    // Right wall
+    const rightWall = new THREE.Mesh(wallGeometry, tunnelMaterial);
+    rightWall.position.set(tunnelWidth / 2 - wallThickness / 2, tunnelHeight / 2 - 0.5, 0);
+    rightWall.castShadow = true;
+    rightWall.receiveShadow = true;
+    tunnelGroup.add(rightWall);
+
+    // Roof
+    const roof = new THREE.Mesh(roofGeometry, tunnelMaterial);
+    roof.position.set(0, tunnelHeight - wallThickness / 2 - 0.5, 0);
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    tunnelGroup.add(roof);
+
+    tunnelGroup.position.set(0, 0, zPosition);
+    tunnelGroup.colorIndex = tunnelColorIndex;
+    tunnelGroup.hasPassed = false;
+
+    scene.add(tunnelGroup);
+    return tunnelGroup;
+}
+
+
 // Make functions globally accessible
 window.createGroundObstacle = createGroundObstacle;
+window.createFloorTunnel = createFloorTunnel;
 // Ball destruction effect function
 function destroyBall() {
     // Create particle explosion effect
