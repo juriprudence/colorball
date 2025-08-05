@@ -10,24 +10,30 @@
     <div id="gameContainer">
         <div id="ui">
             <div>Score: <span id="score">0</span></div>
+            <div id="colorPickupUI" style="display: none;"></div>
         </div>
         
         <div id="instructions">
             <h2>🎮 3D Ring Runner</h2>
             <p>Match your ball color with the ring segments or wall sections!</p>
-            <p><strong>Click or Tap</strong> to move forward</p>
+            <p><strong>Drag up</strong> to move forward</p>
+            <p><strong>Drag left/right</strong> to change ball color (when you have a color pickup)</p>
             <p>Pass through matching colored segments only</p>
-            <p>Watch out for color-changing walls - match the current color to pass through!</p>
-            <button onclick="startGame()">Start Game</button>
+            <button id="startButton">Start Game</button>
         </div>
         
         <div id="gameOver">
             <h2>💥 Game Over!</h2>
             <p>Final Score: <span id="finalScore">0</span></p>
-            <button onclick="restartGame()">Play Again</button>
+            <button id="restartButton">Play Again</button>
         </div>
         
         <canvas id="canvas"></canvas>
+        
+        <!-- Drag direction indicators -->
+        <div id="dragUpIndicator" class="dragIndicator">↑</div>
+        <div id="dragLeftIndicator" class="dragIndicator">←</div>
+        <div id="dragRightIndicator" class="dragIndicator">→</div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>

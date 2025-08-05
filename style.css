@@ -30,6 +30,24 @@ body {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
 }
 
+#colorPickupUI {
+    margin-top: 10px;
+}
+
+.color-option {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+    margin: 5px;
+    border: 2px solid white;
+    cursor: pointer;
+}
+
+.color-option:hover {
+    transform: scale(1.2);
+}
+
 #instructions {
     position: absolute;
     top: 50%;
@@ -130,6 +148,12 @@ button:hover {
         width: 80%;
         max-width: 200px;
     }
+    
+    .color-option {
+        width: 18px;
+        height: 18px;
+        margin: 4px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -164,10 +188,51 @@ button:hover {
         font-size: 14px;
         margin: 6px;
     }
+    
+    .color-option {
+        width: 16px;
+        height: 16px;
+        margin: 3px;
+    }
 }
 
 /* Prevent flashing on mobile */
 * {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+}
+
+/* Drag direction indicators */
+.dragIndicator {
+    position: absolute;
+    z-index: 99;
+    color: white;
+    font-size: 48px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+#dragUpIndicator {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -100px);
+}
+
+#dragLeftIndicator {
+    top: 50%;
+    left: 50%;
+    transform: translate(-100px, -50%);
+}
+
+#dragRightIndicator {
+    top: 50%;
+    left: 50%;
+    transform: translate(100px, -50%);
+}
+
+.dragIndicator.active {
+    opacity: 0.8;
 }

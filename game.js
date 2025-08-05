@@ -1,8 +1,10 @@
 // Game variables
-let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], gameStarted = false, gameOver = false;
+let scene, camera, renderer, ball, backgroundSphere, groundPlanes = [], rings = [], walls = [], pickups = [], groundObstacles = [], gameStarted = false, gameOver = false;
 let ballColor = 0xff0000, score = 0, ballSpeed = 0, maxSpeed = 0.3;
 let cameraOffset = new THREE.Vector3(0, 5, 10);
 let stars = [];
+let hasColorPickup = false; // Track if player has collected a color pickup
+let selectedColorIndex = 0; // Track the currently selected color
 
 // Color palette
 const colors = [0xff0000, 0x00ff00, 0xffff00, 0x0000FF]; // red, green, yellow, dark red
@@ -61,6 +63,11 @@ function init() {
     // Create background sphere
     createBackgroundSphere();
     
+    // Initialize drag indicators
+    dragUpIndicator = document.getElementById('dragUpIndicator');
+    dragLeftIndicator = document.getElementById('dragLeftIndicator');
+    dragRightIndicator = document.getElementById('dragRightIndicator');
+    
     // Start render loop
     animate();
 }
@@ -95,12 +102,15 @@ function checkCollisions() {
                 const furthestZ = Math.min(...rings.map(r => r.position.z)) - 20;
                 createRing(furthestZ);
                 score += 10;
-                changeBallColor();
+                // Only change ball color automatically if player doesn't have a pickup
+                if (!hasColorPickup) {
+                    changeBallColor();
+                }
                 updateScore();
                 maxSpeed = Math.min(maxSpeed + 0.02, 1.2);
             } else {
                 ring.hasPassed = true;
-                endGame();
+                destroyBall();
             }
         } else if (distance >= 5 || Math.abs(ballPosition.z - ringPosition.z) >= 1) {
             ring.hasPassed = false;
@@ -128,7 +138,10 @@ function checkWallCollisions() {
                         wall.hasPassed = true;
                         score += 15;
                         updateScore();
-                        changeBallColor();
+                        // Only change ball color automatically if player doesn't have a pickup
+                        if (!hasColorPickup) {
+                            changeBallColor();
+                        }
                         // Hide the wall after passing
                         scene.remove(wall);
                         walls.splice(wallIndex, 1);
@@ -136,7 +149,7 @@ function checkWallCollisions() {
                 } else {
                     if (!wall.hasPassed) {
                         wall.hasPassed = true;
-                        endGame();
+                        destroyBall();
                     }
                 }
             }
@@ -160,6 +173,103 @@ function checkWallCollisions() {
             }
         }
     });
+}
+
+function checkPickupCollisions() {
+    const ballPosition = ball.position;
+    
+    pickups.forEach((pickup, pickupIndex) => {
+        const pickupPosition = pickup.position;
+        const distance = ballPosition.distanceTo(pickupPosition);
+        
+        // Check if ball collides with pickup
+        if (distance < 1.5) {
+            // Remove pickup
+            scene.remove(pickup);
+            pickups.splice(pickupIndex, 1);
+            
+            // Player now has a color pickup
+            hasColorPickup = true;
+            
+            // Update UI to show available colors
+            updateColorPickupUI();
+            
+            // Add score for collecting pickup
+            score += 5;
+            updateScore();
+        }
+    });
+}
+
+function checkGroundObstacleCollisions() {
+    const ballPosition = ball.position;
+    
+    groundObstacles.forEach((obstacle, obstacleIndex) => {
+        const obstaclePosition = obstacle.position;
+        // Check if ball is at the same z-position as the obstacle
+        if (Math.abs(ballPosition.z - obstaclePosition.z) < 1) {
+            // Check if ball is within the obstacle's boundaries (8x8 square)
+            if (Math.abs(ballPosition.x - obstaclePosition.x) < 4 && Math.abs(ballPosition.y - obstaclePosition.y) < 4) {
+                // Check if colors match
+                if (ballColor === colors[obstacle.currentColorIndex]) {
+                    if (!obstacle.hasPassed) {
+                        obstacle.hasPassed = true;
+                        score += 20; // More points for ground obstacles
+                        updateScore();
+                        // Only change ball color automatically if player doesn't have a pickup
+                        if (!hasColorPickup) {
+                            changeBallColor();
+                        }
+                    }
+                } else {
+                    // If colors don't match, end the game
+                    if (!obstacle.hasPassed) {
+                        obstacle.hasPassed = true;
+                        destroyBall();
+                    }
+                }
+            }
+        }
+        
+        // Remove obstacles that are too far behind and add new ones
+        if (obstacle.position.z > ball.position.z + 20) {
+            scene.remove(obstacle);
+            groundObstacles.splice(obstacleIndex, 1);
+            
+            // Add new obstacle ahead
+            const allZPositions = [
+                ...rings.map(r => r.position.z),
+                ...walls.map(w => w.position.z),
+                ...groundObstacles.map(o => o.position.z)
+            ];
+            const furthestZ = allZPositions.length > 0 ? Math.min(...allZPositions) - 20 : ball.position.z - 40;
+            if (isFinite(furthestZ) && furthestZ < ball.position.z - 40) {
+                const newObstacle = createGroundObstacle(furthestZ);
+                groundObstacles.push(newObstacle);
+            } else if (!isFinite(furthestZ)) {
+                // If there are no rings, walls, or obstacles, create one relative to the ball
+                const newObstacle = createGroundObstacle(ball.position.z - 40);
+                groundObstacles.push(newObstacle);
+            }
+        }
+    });
+}
+
+function updateColorPickupUI() {
+    const uiElement = document.getElementById('ui');
+    if (hasColorPickup) {
+        // Show available colors with selected color highlighted
+        let colorElements = '<div>Available Colors:</div>';
+        colors.forEach((color, index) => {
+            const isSelected = index === selectedColorIndex;
+            const borderStyle = isSelected ? 'border: 2px solid yellow;' : 'border: 2px solid white;';
+            colorElements += `<div class="color-option" style="background-color: #${color.toString(16).padStart(6, '0')}; ${borderStyle}"></div>`;
+        });
+        uiElement.innerHTML = `<div>Score: <span id="score">${score}</span></div>${colorElements}`;
+    } else {
+        // Show just the score
+        uiElement.innerHTML = `<div>Score: <span id="score">${score}</span></div>`;
+    }
 }
 
 function animate() {
@@ -204,6 +314,27 @@ function animate() {
             });
         });
 
+        // Rotate pickups
+        pickups.forEach(pickup => {
+            pickup.rotation.y += 0.05;
+            
+            // Add pulsing effect
+            const scale = 1 + 0.1 * Math.sin(Date.now() * 0.005);
+            pickup.scale.set(scale, scale, scale);
+        });
+        
+        // Animate ground obstacles color changes
+        groundObstacles.forEach(obstacle => {
+            // Change color periodically
+            const time = Date.now() * 0.001;
+            // Change color every 2 seconds
+            if (Math.floor(time * 0.5) % 4 !== obstacle.currentColorIndex) {
+                obstacle.currentColorIndex = Math.floor(time * 0.5) % 4;
+                obstacle.children[0].material.color.setHex(colors[obstacle.currentColorIndex]);
+                obstacle.children[0].material.emissive.setHex(colors[obstacle.currentColorIndex]);
+            }
+        });
+        
         // Update camera to follow ball
         const targetCameraPosition = ball.position.clone().add(cameraOffset);
         camera.position.lerp(targetCameraPosition, 0.1);
@@ -222,6 +353,8 @@ function animate() {
         // Check collisions
         checkCollisions();
         checkWallCollisions();
+        checkPickupCollisions();
+        checkGroundObstacleCollisions();
 
         // Remove rings that are too far behind
         rings.forEach((ring, index) => {
@@ -238,10 +371,73 @@ function animate() {
                 createRing(furthestZ);
             }
         });
+        
+        // Remove pickups that are too far behind
+        pickups.forEach((pickup, index) => {
+            if (pickup.position.z > ball.position.z + 20) {
+                scene.remove(pickup);
+                pickups.splice(index, 1);
+            }
+        });
     }
     
     renderer.render(scene, camera);
 }
+
+function startGame() {
+    // Hide instructions and game over screens
+    document.getElementById('instructions').style.display = 'none';
+    document.getElementById('gameOver').style.display = 'none';
+    
+    // Reset game state
+    gameStarted = true;
+    gameOver = false;
+    score = 0;
+    ballSpeed = 0;
+    hasColorPickup = false; // Reset color pickup
+    selectedColorIndex = 0; // Reset selected color
+    
+    // Reset ball position and color
+    ball.position.set(0, 0, 0);
+    changeBallColor();
+    ball.visible = true; // Make ball visible again after destruction effect
+    
+    // Reset camera
+    camera.position.set(0, 5, 10);
+    camera.lookAt(ball.position);
+    
+    // Create fresh rings and walls
+    createRings();
+    
+    // Update UI
+    updateColorPickupUI();
+    updateScore();
+}
+
+function restartGame() {
+    startGame();
+}
+
+function endGame() {
+    gameOver = true;
+    ballSpeed = 0;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('gameOver').style.display = 'block';
+}
+
+// Add event listeners for buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const startButton = document.getElementById('startButton');
+    const restartButton = document.getElementById('restartButton');
+    
+    if (startButton) {
+        startButton.addEventListener('click', startGame);
+    }
+    
+    if (restartButton) {
+        restartButton.addEventListener('click', restartGame);
+    }
+});
 
 // Make functions globally accessible
 window.startGame = startGame;

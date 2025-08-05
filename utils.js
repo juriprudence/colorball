@@ -10,10 +10,38 @@ let dragSpeed = 0;
 let lastColorChangeTime = 0;
 const colorChangeCooldown = 300; // 300ms cooldown between color changes
 
+// Drag indicator elements
+let dragUpIndicator, dragLeftIndicator, dragRightIndicator;
+
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Functions to show/hide drag indicators
+function showDragIndicator(direction) {
+    // Hide all indicators first
+    hideAllDragIndicators();
+    
+    // Show the appropriate indicator
+    switch(direction) {
+        case 'up':
+            if (dragUpIndicator) dragUpIndicator.classList.add('active');
+            break;
+        case 'left':
+            if (dragLeftIndicator) dragLeftIndicator.classList.add('active');
+            break;
+        case 'right':
+            if (dragRightIndicator) dragRightIndicator.classList.add('active');
+            break;
+    }
+}
+
+function hideAllDragIndicators() {
+    if (dragUpIndicator) dragUpIndicator.classList.remove('active');
+    if (dragLeftIndicator) dragLeftIndicator.classList.remove('active');
+    if (dragRightIndicator) dragRightIndicator.classList.remove('active');
 }
 
 // Drag event handlers
@@ -56,16 +84,60 @@ function onDragMove(event) {
     dragDistanceX = currentX - dragStartX;
     dragDistanceY = dragStartY - currentY; // Negative because dragging up should increase speed
     
-    // Change ball color if dragging left (more than 30 pixels)
-    const currentTime = Date.now();
-    if (dragDistanceX < -30 && (currentTime - lastColorChangeTime) > colorChangeCooldown) {
-        changeBallColor();
-        lastColorChangeTime = currentTime;
+    // Show drag indicator based on primary drag direction
+    if (Math.abs(dragDistanceX) > Math.abs(dragDistanceY)) {
+        // Horizontal drag is dominant
+        if (dragDistanceX > 20) {
+            showDragIndicator('right');
+        } else if (dragDistanceX < -20) {
+            showDragIndicator('left');
+        } else {
+            hideAllDragIndicators();
+        }
+    } else {
+        // Vertical drag is dominant
+        if (dragDistanceY > 10) {
+            showDragIndicator('up');
+        } else {
+            hideAllDragIndicators();
+        }
+    }
+    
+    // If player has a color pickup, allow color changing through horizontal drag
+    if (hasColorPickup) {
+        const currentTime = Date.now();
+        // Change selected color when dragging horizontally more than 20 pixels
+        // and more horizontally than vertically
+        if (Math.abs(dragDistanceX) > 20 && Math.abs(dragDistanceX) > Math.abs(dragDistanceY) &&
+            (currentTime - lastColorChangeTime) > colorChangeCooldown) {
+            // Determine direction of drag
+            if (dragDistanceX > 0) {
+                // Dragging right - cycle to next color
+                selectedColorIndex = (selectedColorIndex + 1) % colors.length;
+            } else {
+                // Dragging left - cycle to previous color
+                selectedColorIndex = (selectedColorIndex - 1 + colors.length) % colors.length;
+            }
+            
+            // Update the ball color immediately
+            ballColor = colors[selectedColorIndex];
+            ball.material.color.setHex(ballColor);
+            ball.material.emissive.setHex(ballColor);
+            
+            // Update UI to show selected color
+            updateColorPickupUI();
+            
+            lastColorChangeTime = currentTime;
+        }
     }
     
     // Update drag speed based on vertical drag distance
-    // Scale the drag distance to a reasonable speed value
-    dragSpeed = Math.min(Math.max(dragDistanceY * 0.01, 0), maxSpeed);
+    // Make vertical drag more sensitive and distinct
+    if (dragDistanceY > 10) { // Only apply speed when dragging up significantly
+        dragSpeed = Math.min(Math.max(dragDistanceY * 0.02, 0), maxSpeed * 1.5); // Increased sensitivity
+    } else {
+        dragSpeed = 0; // No speed when not dragging up significantly
+    }
 }
 
 function onDragEnd(event) {
@@ -73,6 +145,9 @@ function onDragEnd(event) {
     
     event.preventDefault();
     isDragging = false;
+    
+    // Hide all drag indicators
+    hideAllDragIndicators();
     
     // Set the ball speed based on the drag
     if (gameStarted && !gameOver) {
