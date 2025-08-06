@@ -1,4 +1,11 @@
-class Game {
+import Ball from './Ball.js';
+import Ring from './Ring.js';
+import Wall from './Wall.js';
+import GroundOstacle from './GroundOstacle.js';
+import FloorTunnel from './FloorTunnel.js';
+import GroundPlanes from './GroundPlanes.js';
+import ParticleSystem from './ParticleSystem.js';
+export default class Game {
     constructor() {
         this.scene = null;
         this.camera = null;
@@ -177,7 +184,7 @@ class Game {
 
     spawnGroundAndTunnel(zPosition) {
         // Spawn ground obstacle at exact position
-        const groundObstacle = new GroundObstacle(this.scene, zPosition, this.colors);
+        const groundObstacle = new GroundOstacle(this.scene, zPosition, this.colors, this);
         this.groundObstacles.push(groundObstacle);
         
         // Spawn floor tunnel slightly behind
@@ -292,38 +299,6 @@ class Game {
         });
     }
 
-    checkGroundObstacleCollisions() {
-        const ballPosition = this.ball.position;
-
-        this.groundObstacles.forEach((obstacle, obstacleIndex) => {
-            const obstaclePosition = obstacle.position;
-            // Check if ball is at the same z-position as the obstacle
-            if (Math.abs(ballPosition.z - obstaclePosition.z) < 2) {
-                // Check if ball is within the obstacle's boundaries (12x8 rectangle)
-                if (Math.abs(ballPosition.x - obstaclePosition.x) < 6 && Math.abs(ballPosition.y - 0.5) < 1.5) {
-                    // Check if colors match
-                    if (this.ballColor === this.colors[obstacle.currentColorIndex]) {
-                        if (!obstacle.hasPassed) {
-                            obstacle.hasPassed = true;
-                            obstacle.destroy();
-                            this.score += 20; // More points for ground obstacles
-                            this.updateScore();
-                            this.obstaclesPassed++;
-                            this.updateAvailableColors();
-                            this.changeBallColor();
-                        }
-                    } else {
-                        // If colors don't match, end the game
-                        if (!obstacle.hasPassed) {
-                            obstacle.hasPassed = true;
-                            this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
-                            this.ball.destroy();
-                        }
-                    }
-                }
-            }
-        });
-    }
 
     checkFloorTunnelCollisions() {
         const ballPosition = this.ball.position;
@@ -542,7 +517,7 @@ class Game {
             if (Wall && Wall.checkCollisions) {
                 Wall.checkCollisions(this);
             }
-            this.checkGroundObstacleCollisions();
+            this.groundObstacles.forEach(obstacle => obstacle.checkCollision(this.ball));
             this.checkFloorTunnelCollisions();
             this.checkChaserCollision();
 

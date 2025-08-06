@@ -1,4 +1,4 @@
-class Wall {
+export default class Wall {
     constructor(scene, zPosition, colors) {
         this.scene = scene;
         this.mesh = new THREE.Group();

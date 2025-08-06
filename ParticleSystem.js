@@ -1,4 +1,4 @@
-class ParticleSystem {
+export default class ParticleSystem {
     constructor(scene) {
         this.scene = scene;
         this.particles = [];

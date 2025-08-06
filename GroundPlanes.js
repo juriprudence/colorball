@@ -1,4 +1,4 @@
-class GroundPlanes {
+export default class GroundPlanes {
     constructor(scene) {
         this.scene = scene;
         this.planes = [];

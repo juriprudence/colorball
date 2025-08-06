@@ -1,4 +1,4 @@
-class FloorTunnel {
+export default class FloorTunnel {
     constructor(scene, zPosition, colors) {
         this.scene = scene;
         this.mesh = new THREE.Group();

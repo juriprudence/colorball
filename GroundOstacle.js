@@ -1,5 +1,6 @@
-class GroundObstacle {
-    constructor(scene, zPosition, colors) {
+export default class GroundOstacle {
+    constructor(scene, zPosition, colors, game) {
+        this.game = game;
         // Create a rectangle obstacle on the ground
         const obstacleWidth = 12;
         const obstacleHeight = 0.15;
@@ -74,5 +75,32 @@ class GroundObstacle {
                 this.game.scene.remove(this.mesh);
             }
         }, 1000);
+    }
+
+    checkCollision(ball) {
+        const ballPosition = ball.position;
+        const obstaclePosition = this.position;
+
+        if (Math.abs(ballPosition.z - obstaclePosition.z) < 2) {
+            if (Math.abs(ballPosition.x - obstaclePosition.x) < 6 && Math.abs(ballPosition.y - 0.5) < 1.5) {
+                if (this.game.ballColor === this.game.colors[this.currentColorIndex]) {
+                    if (!this.hasPassed) {
+                        this.hasPassed = true;
+                        this.destroy();
+                        this.game.score += 20;
+                        this.game.updateScore();
+                        this.game.obstaclesPassed++;
+                        this.game.updateAvailableColors();
+                        this.game.changeBallColor();
+                    }
+                } else {
+                    if (!this.hasPassed) {
+                        this.hasPassed = true;
+                        this.game.particleSystem.createExplosion(this.game.ball.position, 0xffffff, 50);
+                        this.game.ball.destroy();
+                    }
+                }
+            }
+        }
     }
 }

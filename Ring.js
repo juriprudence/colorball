@@ -1,4 +1,4 @@
-class Ring {
+export default class Ring {
     constructor(scene, zPosition, colors, game) {
         this.game = game;
         this.mesh = new THREE.Group();

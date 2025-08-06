@@ -1,4 +1,4 @@
-class Ball {
+export default class Ball {
     constructor(scene, color, game) {
         this.game = game;
         const ballGeometry = new THREE.SphereGeometry(0.5, 32, 32);
