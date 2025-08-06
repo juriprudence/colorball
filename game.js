@@ -22,9 +22,16 @@ class Game {
         this.stars = [];
         this.selectedColorIndex = 0;
         this.lastChaserTime = 0;
-        this.colors = [0xff0000, 0x00ff00, 0xffff00, 0x0000FF]; // red, green, yellow, dark red
+        this.colors = [0xff0000, 0x00ff00, 0xffff00, 0x0000ff]; // red, green, yellow, blue
         this.availableColors = [this.colors[0]];
-        this.colorNames = ['red', 'green', 'yellow', 'bleu'];
+        this.colorNames = ['red', 'green', 'yellow', 'blue'];
+        
+        // Fixed spawning system with proper level organization
+        this.levelSpacing = 40; // Distance between levels
+        this.nextLevelZ = -50; // Start spawning ahead of ball
+        this.spawnDistance = 120; // How far ahead to maintain obstacles
+        this.despawnDistance = 30; // How far behind to remove obstacles
+        this.levelCounter = 0; // Track which level type to spawn
 
         this.init();
     }
@@ -61,8 +68,8 @@ class Game {
         // Create ball
         this.createBall();
 
-        // Create initial rings
-        this.createRings();
+        // Create initial obstacles
+        this.spawnInitialObstacles();
 
         // Event listeners for drag controls
         const canvas = document.getElementById('canvas');
@@ -103,48 +110,118 @@ class Game {
         this.scene.add(this.backgroundSphere);
     }
 
-
-    createRings() {
-        // Clear existing rings, walls, and ground obstacles
-        this.rings.forEach(ring => this.scene.remove(ring.mesh));
-        this.walls.forEach(wall => this.scene.remove(wall.mesh));
-        this.groundObstacles.forEach(obstacle => this.scene.remove(obstacle.mesh));
-        if (typeof this.floorTunnels !== 'undefined') {
-            this.floorTunnels.forEach(tunnel => this.scene.remove(tunnel.mesh));
+    spawnInitialObstacles() {
+        // Clear existing obstacles
+        this.clearAllObstacles();
+        
+        // Reset spawn positions
+        this.nextLevelZ = -50;
+        this.levelCounter = 0;
+        
+        // Spawn initial set of levels
+        for (let i = 0; i < 8; i++) {
+            this.spawnNextLevel();
         }
+    }
+
+    clearAllObstacles() {
+        // Remove all existing obstacles from scene and arrays
+        this.rings.forEach(ring => {
+            if (ring.mesh) this.scene.remove(ring.mesh);
+        });
+        this.walls.forEach(wall => {
+            if (wall.mesh) this.scene.remove(wall.mesh);
+        });
+        this.groundObstacles.forEach(obstacle => {
+            if (obstacle.mesh) this.scene.remove(obstacle.mesh);
+        });
+        this.floorTunnels.forEach(tunnel => {
+            if (tunnel.mesh) this.scene.remove(tunnel.mesh);
+        });
+        
         this.rings = [];
         this.walls = [];
         this.groundObstacles = [];
         this.floorTunnels = [];
-
-        // Create obstacles further ahead of the ball's starting position
-        for (let i = 0; i < 10; i++) {
-            this.rings.push(new Ring(this.scene, i * 20 + 30, this.colors, this));
-            // Create walls at alternating positions
-            if (i % 2 === 1) {
-                this.walls.push(new Wall(this.scene, i * 20 + 40, this.colors));
-            }
-            // Create ground obstacles at regular intervals
-            if (i % 4 === 0) {
-                this.createGroundObstacle(i * 20 + 32);
-            }
-            // Create floor tunnels
-            if (i > 0 && i % 3 === 0) {
-                this.floorTunnels.push(new FloorTunnel(this.scene, i * 20 + 50, this.colors));
-            }
-        }
     }
 
-    isPositionOccupiedByRing(zPosition) {
-        const ringZPositions = this.rings.map(ring => ring.position.z);
-        return ringZPositions.includes(zPosition);
+    spawnNextLevel() {
+        const levelType = this.levelCounter % 2; // Alternate between 0 and 1
+        
+        if (levelType === 0) {
+            // Level 1: Ring + Wall (aerial obstacles)
+            this.spawnRingAndWall(this.nextLevelZ);
+        } else {
+            // Level 2: Ground Obstacle + Floor Tunnel (ground obstacles)
+            this.spawnGroundAndTunnel(this.nextLevelZ);
+        }
+        
+        this.nextLevelZ -= this.levelSpacing;
+        this.levelCounter++;
     }
 
-    createGroundObstacle(zPosition) {
-        if (!this.isPositionOccupiedByRing(zPosition)) {
-            const newObstacle = new GroundObstacle(this.scene, zPosition, this.colors);
-            this.groundObstacles.push(newObstacle);
+    spawnRingAndWall(zPosition) {
+        // Spawn ring at exact position
+        const ring = new Ring(this.scene, zPosition, this.colors, this);
+        this.rings.push(ring);
+        
+        // Spawn wall slightly ahead (closer to player)
+        const wallZ = zPosition + 15;
+        const wall = new Wall(this.scene, wallZ, this.colors);
+        this.walls.push(wall);
+    }
+
+    spawnGroundAndTunnel(zPosition) {
+        // Spawn ground obstacle at exact position
+        const groundObstacle = new GroundObstacle(this.scene, zPosition, this.colors);
+        this.groundObstacles.push(groundObstacle);
+        
+        // Spawn floor tunnel slightly behind
+        const tunnelZ = zPosition - 15;
+        const floorTunnel = new FloorTunnel(this.scene, tunnelZ, this.colors);
+        this.floorTunnels.push(floorTunnel);
+    }
+
+    updateObstacles() {
+        const ballZ = this.ball.position.z;
+        
+        // Spawn new levels ahead
+        while (this.nextLevelZ > ballZ - this.spawnDistance) {
+            this.spawnNextLevel();
         }
+        
+        // Remove obstacles that are too far behind
+        this.rings = this.rings.filter(ring => {
+            if (ring.position.z > ballZ + this.despawnDistance) {
+                if (ring.mesh) this.scene.remove(ring.mesh);
+                return false;
+            }
+            return true;
+        });
+
+        this.walls = this.walls.filter(wall => {
+            if (wall.position.z > ballZ + this.despawnDistance) {
+                if (wall.mesh) this.scene.remove(wall.mesh);
+                return false;
+            }
+            return true;
+        });
+
+        this.groundObstacles = this.groundObstacles.filter(obstacle => {
+            if (obstacle.position.z > ballZ + this.despawnDistance) {
+                if (obstacle.mesh) this.scene.remove(obstacle.mesh);
+                return false;
+            }
+            return true;
+        });
+
+        this.floorTunnels = this.floorTunnels.filter(tunnel => {
+            if (tunnel.position.z > ballZ + this.despawnDistance) {
+                if (tunnel.mesh) this.scene.remove(tunnel.mesh);
+                return false;
+            }
+            return true;
+        });
     }
 
     createChaser() {
@@ -162,107 +239,10 @@ class Game {
         return chaser;
     }
 
-
-
-    destroyWall(wall) {
-        // Create particle explosion effect
-        const particleCount = 40;
-        const particleGeometry = new THREE.BufferGeometry();
-        const particlePositions = new Float32Array(particleCount * 3);
-        const particleColors = new Float32Array(particleCount * 3);
-        const particleSizes = new Float32Array(particleCount);
-
-        // Get wall position
-        const wallPosition = wall.position.clone();
-
-        // Initialize particle positions and colors
-        for (let i = 0; i < particleCount; i++) {
-            // Position particles at the wall's location with some random spread
-            particlePositions[i * 3] = wallPosition.x + (Math.random() - 0.5) * 6;
-            particlePositions[i * 3 + 1] = wallPosition.y + (Math.random() - 0.5) * 6;
-            particlePositions[i * 3 + 2] = wallPosition.z + (Math.random() - 0.5) * 2;
-
-            // Set particle colors to match the wall's colors with some variation
-            // Get a random segment color from the wall
-            const segments = wall.children;
-            const randomSegment = segments[Math.floor(Math.random() * segments.length)];
-            const segmentColor = randomSegment.material.color.getHex();
-
-            const r = ((segmentColor >> 16) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-            const g = ((segmentColor >> 8) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-            const b = (segmentColor & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-
-            particleColors[i * 3] = Math.min(1, Math.max(0, r));
-            particleColors[i * 3 + 1] = Math.min(1, Math.max(0, g));
-            particleColors[i * 3 + 2] = Math.min(1, Math.max(0, b));
-
-            // Random particle sizes
-            particleSizes[i] = Math.random() * 0.4 + 0.1;
-        }
-
-        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-        particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
-        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0.4,
-            vertexColors: true,
-            transparent: true,
-            opacity: 1.0,
-            sizeAttenuation: true
-        });
-
-        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-        this.scene.add(particleSystem);
-
-        // Hide the wall
-        wall.visible = false;
-
-        // Animate particles
-        const startTime = Date.now();
-        const duration = 900; // 0.9 second
-
-        const animateWallParticles = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Update particle positions to move outward
-            const positions = particleGeometry.attributes.position.array;
-            for (let i = 0; i < particleCount; i++) {
-                // Move particles outward from center
-                const directionX = positions[i * 3] - wallPosition.x;
-                const directionY = positions[i * 3 + 1] - wallPosition.y;
-                const directionZ = positions[i * 3 + 2] - wallPosition.z;
-
-                // Normalize and scale by progress
-                const length = Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
-                if (length > 0) {
-                    positions[i * 3] += (directionX / length) * progress * 2;
-                    positions[i * 3 + 1] += (directionY / length) * progress * 2;
-                    positions[i * 3 + 2] += (directionZ / length) * progress * 2;
-                }
-            }
-            particleGeometry.attributes.position.needsUpdate = true;
-
-            // Fade out particles
-            particleMaterial.opacity = 1 - progress;
-
-            // Continue animation or clean up
-            if (progress < 1) {
-                requestAnimationFrame(animateWallParticles);
-            } else {
-                // Remove particles
-                this.scene.remove(particleSystem);
-            }
-        }
-
-        // Start animation
-        animateWallParticles();
-    }
-
     checkCollisions() {
         const ballPosition = this.ball.position;
 
+        // Check ring collisions
         this.rings.forEach((ring, ringIndex) => {
             if (!ring.game) {
                 ring.game = this;
@@ -306,16 +286,15 @@ class Game {
         });
     }
 
-
     checkGroundObstacleCollisions() {
         const ballPosition = this.ball.position;
 
         this.groundObstacles.forEach((obstacle, obstacleIndex) => {
             const obstaclePosition = obstacle.position;
             // Check if ball is at the same z-position as the obstacle
-            if (Math.abs(ballPosition.z - obstaclePosition.z) < 1) {
-                // Check if ball is within the obstacle's boundaries (8x8 square)
-                if (Math.abs(ballPosition.x - obstaclePosition.x) < 4 && Math.abs(ballPosition.y - 0.5) < 1.25) {
+            if (Math.abs(ballPosition.z - obstaclePosition.z) < 2) {
+                // Check if ball is within the obstacle's boundaries (12x8 rectangle)
+                if (Math.abs(ballPosition.x - obstaclePosition.x) < 6 && Math.abs(ballPosition.y - 0.5) < 1.5) {
                     // Check if colors match
                     if (this.ballColor === this.colors[obstacle.currentColorIndex]) {
                         if (!obstacle.hasPassed) {
@@ -335,26 +314,6 @@ class Game {
                     }
                 }
             }
-
-            // Remove obstacles that are too far behind and add new ones
-            if (obstacle.position.z > this.ball.position.z + 20) {
-                this.scene.remove(obstacle.mesh);
-                this.groundObstacles.splice(obstacleIndex, 1);
-
-                // Add new obstacle ahead
-                const allZPositions = [
-                    ...this.rings.map(r => r.position.z),
-                    ...this.walls.map(w => w.position.z),
-                    ...this.groundObstacles.map(o => o.position.z)
-                ];
-                const furthestZ = allZPositions.length > 0 ? Math.min(...allZPositions) - 20 : this.ball.position.z - 40;
-                if (isFinite(furthestZ) && furthestZ < this.ball.position.z - 40) {
-                    this.createGroundObstacle(furthestZ);
-                } else if (!isFinite(furthestZ)) {
-                    // If there are no rings, walls, or obstacles, create one relative to the ball
-                    this.createGroundObstacle(this.ball.position.z - 40);
-                }
-            }
         });
     }
 
@@ -362,9 +321,9 @@ class Game {
         const ballPosition = this.ball.position;
         this.floorTunnels.forEach((tunnel, index) => {
             const tunnelPosition = tunnel.position;
-            const tunnelLength = 10;
-            const tunnelWidth = 5;
-            const tunnelHeight = 3;
+            const tunnelLength = 12;
+            const tunnelWidth = 6;
+            const tunnelHeight = 4;
 
             if (ballPosition.z > tunnelPosition.z - tunnelLength / 2 && ballPosition.z < tunnelPosition.z + tunnelLength / 2) {
                 if (
@@ -389,16 +348,14 @@ class Game {
                         }
                     }
                 } else {
-                    if (!tunnel.hasPassed) {
+                    // Ball is in the tunnel zone but not in the safe area
+                    if (!tunnel.hasPassed && 
+                        ballPosition.x > tunnelPosition.x - tunnelWidth / 2 - 2 &&
+                        ballPosition.x < tunnelPosition.x + tunnelWidth / 2 + 2) {
                         tunnel.hasPassed = true;
                         this.ball.destroy();
                     }
                 }
-            }
-
-            if (tunnel.position.z > this.ball.position.z + 20) {
-                this.scene.remove(tunnel.mesh);
-                this.floorTunnels.splice(index, 1);
             }
         });
     }
@@ -423,7 +380,8 @@ class Game {
                         if (this.selectedColorIndex >= this.availableColors.length) {
                             this.selectedColorIndex = 0; // default to the first color
                         }
-                        this.ball.color = this.availableColors[this.selectedColorIndex];
+                        this.ballColor = this.availableColors[this.selectedColorIndex];
+                        this.ball.color = this.ballColor;
                     }
                 }
 
@@ -473,7 +431,10 @@ class Game {
     }
 
     updateScore() {
-        document.getElementById('score').textContent = this.score;
+        const scoreElement = document.getElementById('score');
+        if (scoreElement) {
+            scoreElement.textContent = this.score;
+        }
     }
 
     animate() {
@@ -487,25 +448,36 @@ class Game {
                 if (this.ballSpeed < 0.01) this.ballSpeed = 0; // Stop completely when very slow
             }
 
+            // Update obstacle spawning and removal
+            this.updateObstacles();
+
             // Update ground planes
-            this.groundPlanes.update(this.ball.position);
+            if (this.groundPlanes && this.groundPlanes.update) {
+                this.groundPlanes.update(this.ball.position);
+            }
 
             // Rotate rings
             this.rings.forEach(ring => {
-                ring.rotation.z += ring.mesh.rotationSpeed;
+                if (ring.mesh && ring.mesh.rotationSpeed) {
+                    ring.rotation.z += ring.mesh.rotationSpeed;
+                }
             });
 
             // Rotate wall colors (slower)
             this.walls.forEach(wall => {
-                wall.children.forEach((segment, index) => {
-                    // Calculate new color index based on rotation
-                    const time = Date.now() * 0.001;
-                    const colorOffset = Math.floor(time * 1.2) % 4; // Adjusted speed
-                    const newColorIndex = (segment.originalColorIndex + colorOffset) % 4;
-                    segment.material.color.setHex(this.colors[newColorIndex]);
-                    segment.material.emissive.setHex(this.colors[newColorIndex]);
-                    segment.currentColorIndex = newColorIndex;
-                });
+                if (wall.children) {
+                    wall.children.forEach((segment, index) => {
+                        // Calculate new color index based on rotation
+                        const time = Date.now() * 0.001;
+                        const colorOffset = Math.floor(time * 1.2) % 4; // Adjusted speed
+                        const newColorIndex = (segment.originalColorIndex + colorOffset) % 4;
+                        if (segment.material && segment.material.color) {
+                            segment.material.color.setHex(this.colors[newColorIndex]);
+                            segment.material.emissive.setHex(this.colors[newColorIndex]);
+                            segment.currentColorIndex = newColorIndex;
+                        }
+                    });
+                }
             });
 
             if (this.chaser) {
@@ -517,11 +489,19 @@ class Game {
                 // Change color periodically
                 const time = Date.now() * 0.001;
                 // Change color every 2 seconds
-                if (Math.floor(time * 0.5) % 4 !== obstacle.currentColorIndex) {
-                    obstacle.currentColorIndex = Math.floor(time * 0.5) % 4;
-                    obstacle.children[0].material.color.setHex(this.colors[obstacle.currentColorIndex]);
-                    obstacle.children[0].material.emissive.setHex(this.colors[obstacle.currentColorIndex]);
+                const newColorIndex = Math.floor(time * 0.5) % 4;
+                if (newColorIndex !== obstacle.currentColorIndex) {
+                    obstacle.currentColorIndex = newColorIndex;
+                    if (obstacle.children && obstacle.children[0] && obstacle.children[0].material) {
+                        obstacle.children[0].material.color.setHex(this.colors[obstacle.currentColorIndex]);
+                        obstacle.children[0].material.emissive.setHex(this.colors[obstacle.currentColorIndex]);
+                    }
                 }
+            });
+
+            // Animate floor tunnel color changes
+            this.floorTunnels.forEach(tunnel => {
+                tunnel.updateColor();
             });
 
             // Update camera to follow ball
@@ -541,27 +521,14 @@ class Game {
 
             // Check collisions
             this.checkCollisions();
-            Wall.checkCollisions(this);
+            if (Wall && Wall.checkCollisions) {
+                Wall.checkCollisions(this);
+            }
             this.checkGroundObstacleCollisions();
             this.checkFloorTunnelCollisions();
             this.checkChaserCollision();
 
-            // Remove rings that are too far behind
-            this.rings.forEach((ring, index) => {
-                if (ring.position.z > this.ball.position.z + 20) {
-                    this.scene.remove(ring.mesh);
-                    this.rings.splice(index, 1);
-
-                    // Add new ring ahead
-                    const allZPositions = [
-                        ...this.rings.map(r => r.position.z),
-                        ...this.walls.map(w => w.position.z)
-                    ];
-                    const furthestZ = allZPositions.length > 0 ? Math.min(...allZPositions) - 20 : this.ball.position.z - 40;
-                    this.rings.push(new Ring(this.scene, furthestZ, this.colors));
-                }
-            });
-
+            // Spawn chaser periodically
             const currentTime = Date.now();
             if (this.gameStarted && !this.gameOver && this.availableColors.length > 1 && !this.chaser && (currentTime - this.lastChaserTime) > 10000) {
                 this.chaser = this.createChaser();
@@ -574,8 +541,10 @@ class Game {
 
     startGame() {
         // Hide instructions and game over screens
-        document.getElementById('instructions').style.display = 'none';
-        document.getElementById('gameOver').style.display = 'none';
+        const instructionsEl = document.getElementById('instructions');
+        const gameOverEl = document.getElementById('gameOver');
+        if (instructionsEl) instructionsEl.style.display = 'none';
+        if (gameOverEl) gameOverEl.style.display = 'none';
 
         // Reset game state
         this.gameStarted = true;
@@ -585,6 +554,8 @@ class Game {
         this.selectedColorIndex = 0; // Reset selected color
         this.obstaclesPassed = 0;
         this.availableColors = [this.colors[0]];
+        this.lastChaserTime = 0;
+        
         if (this.chaser) {
             this.scene.remove(this.chaser);
             this.chaser = null;
@@ -592,15 +563,16 @@ class Game {
 
         // Reset ball position and color
         this.ball.position.set(0, 0, 0);
-        this.changeBallColor();
+        this.ballColor = this.availableColors[this.selectedColorIndex];
+        this.ball.color = this.ballColor;
         this.ball.visible = true; // Make ball visible again after destruction effect
 
         // Reset camera
         this.camera.position.set(0, 5, 10);
         this.camera.lookAt(this.ball.position);
 
-        // Create fresh rings and walls
-        this.createRings();
+        // Create fresh obstacles
+        this.spawnInitialObstacles();
 
         // Update UI
         this.updateAvailableColorsUI();
@@ -608,7 +580,8 @@ class Game {
 
     restartGame() {
         // Hide game over screen
-        document.getElementById('gameOver').style.display = 'none';
+        const gameOverEl = document.getElementById('gameOver');
+        if (gameOverEl) gameOverEl.style.display = 'none';
 
         // Reset game state
         this.score = 0;
@@ -628,14 +601,18 @@ class Game {
         }
 
         // Reset ball
-        this.scene.remove(this.ball.mesh);
+        if (this.ball && this.ball.mesh) {
+            this.scene.remove(this.ball.mesh);
+        }
         this.createBall();
 
         // Reset obstacles
-        this.createRings();
+        this.spawnInitialObstacles();
 
         // Reset ground planes
-        this.groundPlanes.create();
+        if (this.groundPlanes && this.groundPlanes.create) {
+            this.groundPlanes.create();
+        }
 
         // Update UI
         this.updateScore();
@@ -645,8 +622,10 @@ class Game {
     endGame() {
         this.gameOver = true;
         this.ballSpeed = 0;
-        document.getElementById('finalScore').textContent = this.score;
-        document.getElementById('gameOver').style.display = 'block';
+        const finalScoreEl = document.getElementById('finalScore');
+        const gameOverEl = document.getElementById('gameOver');
+        if (finalScoreEl) finalScoreEl.textContent = this.score;
+        if (gameOverEl) gameOverEl.style.display = 'block';
     }
 
     onWindowResize() {
@@ -656,54 +635,57 @@ class Game {
     }
 
     onDragStart(event) {
-        this.dragStartX = event.clientX || event.touches[0].clientX;
-        this.dragStartY = event.clientY || event.touches[0].clientY;
+        this.dragStartX = event.clientX || (event.touches && event.touches[0].clientX);
+        this.dragStartY = event.clientY || (event.touches && event.touches[0].clientY);
     }
 
     onDragMove(event) {
-        if (this.dragStartX === null) return;
+        if (this.dragStartX === null || this.dragStartX === undefined) return;
 
-        const currentX = event.clientX || event.touches[0].clientX;
-        const currentY = event.clientY || event.touches[0].clientY;
+        const currentX = event.clientX || (event.touches && event.touches[0].clientX);
+        const currentY = event.clientY || (event.touches && event.touches[0].clientY);
 
         const deltaX = currentX - this.dragStartX;
         const deltaY = currentY - this.dragStartY;
 
         if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY < -20) { // Upward drag
             this.ballSpeed = Math.min(this.ballSpeed + 0.05, this.maxSpeed);
-            this.dragUpIndicator.style.opacity = 1;
+            if (this.dragUpIndicator) this.dragUpIndicator.style.opacity = 1;
         } else {
-            this.dragUpIndicator.style.opacity = 0;
+            if (this.dragUpIndicator) this.dragUpIndicator.style.opacity = 0;
         }
 
         if (Math.abs(deltaX) > Math.abs(deltaY)) { // Horizontal drag
             if (deltaX < -20) { // Left drag
-                this.dragLeftIndicator.style.opacity = 1;
+                if (this.dragLeftIndicator) this.dragLeftIndicator.style.opacity = 1;
             } else if (deltaX > 20) { // Right drag
-                this.dragRightIndicator.style.opacity = 1;
+                if (this.dragRightIndicator) this.dragRightIndicator.style.opacity = 1;
             }
         } else {
-            this.dragLeftIndicator.style.opacity = 0;
-            this.dragRightIndicator.style.opacity = 0;
+            if (this.dragLeftIndicator) this.dragLeftIndicator.style.opacity = 0;
+            if (this.dragRightIndicator) this.dragRightIndicator.style.opacity = 0;
         }
     }
 
     onDragEnd(event) {
-        const deltaX = (event.clientX || event.changedTouches[0].clientX) - this.dragStartX;
-        const deltaY = (event.clientY || event.changedTouches[0].clientY) - this.dragStartY;
+        if (this.dragStartX === null || this.dragStartX === undefined) return;
+
+        const currentX = event.clientX || (event.changedTouches && event.changedTouches[0].clientX);
+        const currentY = event.clientY || (event.changedTouches && event.changedTouches[0].clientY);
+        
+        const deltaX = currentX - this.dragStartX;
+        const deltaY = currentY - this.dragStartY;
 
         if (Math.abs(deltaX) > Math.abs(deltaY)) { // Horizontal drag
-            if (deltaX < -20) { // Left drag
-                this.changeBallColor();
-            } else if (deltaX > 20) { // Right drag
+            if (Math.abs(deltaX) > 20) { // Minimum drag distance
                 this.changeBallColor();
             }
         }
 
         this.dragStartX = null;
         this.dragStartY = null;
-        this.dragUpIndicator.style.opacity = 0;
-        this.dragLeftIndicator.style.opacity = 0;
-        this.dragRightIndicator.style.opacity = 0;
+        if (this.dragUpIndicator) this.dragUpIndicator.style.opacity = 0;
+        if (this.dragLeftIndicator) this.dragLeftIndicator.style.opacity = 0;
+        if (this.dragRightIndicator) this.dragRightIndicator.style.opacity = 0;
     }
 }

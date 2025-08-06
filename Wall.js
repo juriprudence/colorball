@@ -1,5 +1,6 @@
 class Wall {
     constructor(scene, zPosition, colors) {
+        this.scene = scene;
         this.mesh = new THREE.Group();
         const wallWidth = 12; // Increased width
         const wallHeight = 12; // Increased height
@@ -54,6 +55,103 @@ class Wall {
         this.mesh.visible = value;
     }
 
+    destroy() {
+        // Create particle explosion effect
+        const particleCount = 40;
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        const particleColors = new Float32Array(particleCount * 3);
+        const particleSizes = new Float32Array(particleCount);
+
+        // Get wall position
+        const wallPosition = this.position.clone();
+
+        // Initialize particle positions and colors
+        for (let i = 0; i < particleCount; i++) {
+            // Position particles at the wall's location with some random spread
+            particlePositions[i * 3] = wallPosition.x + (Math.random() - 0.5) * 6;
+            particlePositions[i * 3 + 1] = wallPosition.y + (Math.random() - 0.5) * 6;
+            particlePositions[i * 3 + 2] = wallPosition.z + (Math.random() - 0.5) * 2;
+
+            // Set particle colors to match the wall's colors with some variation
+            // Get a random segment color from the wall
+            const segments = this.children;
+            const randomSegment = segments[Math.floor(Math.random() * segments.length)];
+            const segmentColor = randomSegment.material.color.getHex();
+
+            const r = ((segmentColor >> 16) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
+            const g = ((segmentColor >> 8) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
+            const b = (segmentColor & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
+
+            particleColors[i * 3] = Math.min(1, Math.max(0, r));
+            particleColors[i * 3 + 1] = Math.min(1, Math.max(0, g));
+            particleColors[i * 3 + 2] = Math.min(1, Math.max(0, b));
+
+            // Random particle sizes
+            particleSizes[i] = Math.random() * 0.4 + 0.1;
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.4,
+            vertexColors: true,
+            transparent: true,
+            opacity: 1.0,
+            sizeAttenuation: true
+        });
+
+        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        this.scene.add(particleSystem);
+
+        // Hide the wall
+        this.visible = false;
+
+        // Animate particles
+        const startTime = Date.now();
+        const duration = 900; // 0.9 second
+        const scene = this.scene;
+
+        const animateWallParticles = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Update particle positions to move outward
+            const positions = particleGeometry.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                // Move particles outward from center
+                const directionX = positions[i * 3] - wallPosition.x;
+                const directionY = positions[i * 3 + 1] - wallPosition.y;
+                const directionZ = positions[i * 3 + 2] - wallPosition.z;
+
+                // Normalize and scale by progress
+                const length = Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+                if (length > 0) {
+                    positions[i * 3] += (directionX / length) * progress * 2;
+                    positions[i * 3 + 1] += (directionY / length) * progress * 2;
+                    positions[i * 3 + 2] += (directionZ / length) * progress * 2;
+                }
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+
+            // Fade out particles
+            particleMaterial.opacity = 1 - progress;
+
+            // Continue animation or clean up
+            if (progress < 1) {
+                requestAnimationFrame(animateWallParticles);
+            } else {
+                // Remove particles
+                scene.remove(particleSystem);
+            }
+        }
+
+        // Start animation
+        animateWallParticles();
+    }
+
     static checkCollisions(game) {
         const ballPosition = game.ball.position;
 
@@ -74,7 +172,7 @@ class Wall {
                         if (!wall.hasPassed) {
                             wall.hasPassed = true;
                             // Use destruction effect instead of directly removing
-                            game.destroyWall(wall.mesh);
+                            wall.destroy();
                             // Remove wall after a short delay to allow animation to play
                             setTimeout(() => {
                                 game.scene.remove(wall.mesh);

@@ -1,8 +1,8 @@
 class GroundObstacle {
     constructor(scene, zPosition, colors) {
         // Create a rectangle obstacle on the ground
-        const obstacleWidth = 8;
-        const obstacleHeight = 0.5;
+        const obstacleWidth = 12;
+        const obstacleHeight = 0.15;
         const obstacleDepth = 8;
 
         // Create a group for the obstacle
@@ -18,7 +18,7 @@ class GroundObstacle {
         const obstacle = new THREE.Mesh(geometry, material);
 
         // Position the obstacle on the ground (y = -0.5 to sit on the ground plane)
-        obstacle.position.set(0, 0.5, 0);
+        obstacle.position.set(0, -0.53, 0);
         obstacle.castShadow = true;
         obstacle.receiveShadow = true;
 
