@@ -18,7 +18,7 @@ class GroundObstacle {
         const obstacle = new THREE.Mesh(geometry, material);
 
         // Position the obstacle on the ground (y = -0.5 to sit on the ground plane)
-        obstacle.position.set(0, -0.25, 0);
+        obstacle.position.set(0, 0.5, 0);
         obstacle.castShadow = true;
         obstacle.receiveShadow = true;
 

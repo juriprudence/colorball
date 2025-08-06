@@ -5,7 +5,7 @@ class Game {
         this.renderer = null;
         this.ball = null;
         this.backgroundSphere = null;
-        this.groundPlanes = [];
+        this.groundPlanes = null;
         this.rings = [];
         this.walls = [];
         this.groundObstacles = [];
@@ -56,7 +56,7 @@ class Game {
         this.scene.add(directionalLight);
 
         // Create infinite table (ground)
-        this.createGroundPlanes();
+        this.groundPlanes = new GroundPlanes(this.scene);
 
         // Create ball
         this.createBall();
@@ -103,59 +103,6 @@ class Game {
         this.scene.add(this.backgroundSphere);
     }
 
-    createGroundPlanes() {
-        // Remove old planes if any
-        this.groundPlanes.forEach(plane => this.scene.remove(plane));
-        this.groundPlanes = [];
-        // Create several large planes tiled along z to simulate infinity
-        const planeWidth = 30;
-        const planeHeight = 60;
-        const numPlanes = 5;
-        // Glass-like shader material
-        const glassVertexShader = `
-            varying vec2 vUv;
-            varying vec3 vWorldPosition;
-            void main() {
-                vUv = uv;
-                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                vWorldPosition = worldPosition.xyz;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `;
-        const glassFragmentShader = `
-            varying vec2 vUv;
-            varying vec3 vWorldPosition;
-            void main() {
-                // Simulate fresnel effect
-                float fresnel = pow(1.0 - abs(dot(normalize(vec3(0.0, 1.0, 0.0)), normalize(vec3(0.0, 1.0, 0.0)))), 2.0);
-                // Blue glass tint
-                vec3 glassColor = vec3(0.2, 0.4, 0.8);
-                // Simulate a moving highlight
-                float highlight = smoothstep(0.0, 0.15, abs(vUv.x - 0.5) + abs(vUv.y - 0.5) - 0.2 * sin(vWorldPosition.z * 0.05 + vWorldPosition.x * 0.05));
-                // Add a subtle reflection (white)
-                float reflection = 0.5 * fresnel + 0.2 * highlight;
-                // Add a subtle refraction tint
-                vec3 color = mix(glassColor, vec3(1.0), reflection);
-                float glassAlpha = 0.13 + 0.18 * fresnel + 0.1 * highlight;
-                gl_FragColor = vec4(color, glassAlpha);
-            }
-        `;
-        const glassMaterial = new THREE.ShaderMaterial({
-            vertexShader: glassVertexShader,
-            fragmentShader: glassFragmentShader,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        for (let i = 0; i < numPlanes; i++) {
-            const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight);
-            const plane = new THREE.Mesh(geometry, glassMaterial);
-            plane.rotation.x = -Math.PI / 2;
-            plane.position.set(0, -0.5, -i * planeHeight);
-            plane.receiveShadow = true;
-            this.scene.add(plane);
-            this.groundPlanes.push(plane);
-        }
-    }
 
     createRings() {
         // Clear existing rings, walls, and ground obstacles
@@ -781,18 +728,8 @@ class Game {
                 if (this.ballSpeed < 0.01) this.ballSpeed = 0; // Stop completely when very slow
             }
 
-            // Move ground planes to simulate infinite table
-            const planeHeight = 60;
-            this.groundPlanes.forEach(plane => {
-                // If plane is too far behind the ball, move it ahead
-                if (plane.position.z - this.ball.position.z > planeHeight * 2) {
-                    plane.position.z -= planeHeight * this.groundPlanes.length;
-                }
-                // If plane is too far ahead, move it behind
-                if (this.ball.position.z - plane.position.z > planeHeight * 2) {
-                    plane.position.z += planeHeight * this.groundPlanes.length;
-                }
-            });
+            // Update ground planes
+            this.groundPlanes.update(this.ball.position);
 
             // Rotate rings
             this.rings.forEach(ring => {
@@ -911,7 +848,39 @@ class Game {
     }
 
     restartGame() {
-        this.startGame();
+        // Hide game over screen
+        document.getElementById('gameOver').style.display = 'none';
+
+        // Reset game state
+        this.score = 0;
+        this.ballSpeed = 0;
+        this.maxSpeed = 0.3;
+        this.obstaclesPassed = 0;
+        this.gameOver = false;
+        this.gameStarted = true;
+        this.availableColors = [this.colors[0]];
+        this.selectedColorIndex = 0;
+        this.lastChaserTime = 0;
+
+        // Remove old chaser if any
+        if (this.chaser) {
+            this.scene.remove(this.chaser);
+            this.chaser = null;
+        }
+
+        // Reset ball
+        this.scene.remove(this.ball.mesh);
+        this.createBall();
+
+        // Reset obstacles
+        this.createRings();
+
+        // Reset ground planes
+        this.groundPlanes.create();
+
+        // Update UI
+        this.updateScore();
+        this.updateAvailableColorsUI();
     }
 
     endGame() {
