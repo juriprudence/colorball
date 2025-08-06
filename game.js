@@ -356,20 +356,26 @@ export default class Game {
 
             // If the player has the chaser's color in their palette
             if (chaserColorIndex !== -1) {
-                // If it's not the last color, remove it
-                if (this.availableColors.length > 1) {
-                    const removedColor = this.availableColors.splice(chaserColorIndex, 1)[0];
+                // Remove the color
+                const removedColor = this.availableColors.splice(chaserColorIndex, 1)[0];
 
-                    // If the ball's current color was the one that was removed,
-                    // we must change the ball's color to a new one.
-                    if (this.ballColor === removedColor) {
-                        // Reset selected index to a valid one before changing color
-                        if (this.selectedColorIndex >= this.availableColors.length) {
-                            this.selectedColorIndex = 0; // default to the first color
-                        }
-                        this.ballColor = this.availableColors[this.selectedColorIndex];
-                        this.ball.color = this.ballColor;
+                // Check if this was the last color
+                if (this.availableColors.length === 0) {
+                    // Game over - no colors left
+                    this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
+                    this.ball.destroy();
+                    return;
+                }
+
+                // If the ball's current color was the one that was removed,
+                // we must change the ball's color to a new one.
+                if (this.ballColor === removedColor) {
+                    // Reset selected index to a valid one before changing color
+                    if (this.selectedColorIndex >= this.availableColors.length) {
+                        this.selectedColorIndex = 0; // default to the first color
                     }
+                    this.ballColor = this.availableColors[this.selectedColorIndex];
+                    this.ball.color = this.ballColor;
                 }
 
                 // Player survives
@@ -429,6 +435,9 @@ export default class Game {
         requestAnimationFrame(this.animate.bind(this));
 
         if (this.gameStarted && !this.gameOver) {
+            const currentTime = Date.now();
+            const timeInSeconds = currentTime * 0.001;
+
             // Move ball forward only when there's input
             if (this.ballSpeed > 0) {
                 this.ball.position.z -= this.ballSpeed;
@@ -461,8 +470,7 @@ export default class Game {
                 if (wall.children) {
                     wall.children.forEach((segment, index) => {
                         // Calculate new color index based on rotation
-                        const time = Date.now() * 0.001;
-                        const colorOffset = Math.floor(time * 1.2) % 4; // Adjusted speed
+                        const colorOffset = Math.floor(timeInSeconds * 1.2) % 4; // Adjusted speed
                         const newColorIndex = (segment.originalColorIndex + colorOffset) % 4;
                         if (segment.material && segment.material.color) {
                             segment.material.color.setHex(this.colors[newColorIndex]);
@@ -473,16 +481,26 @@ export default class Game {
                 }
             });
 
-            if (this.chaser) {
-                this.chaser.position.z -= 0.1;
+            // Spawn chaser periodically (around line 480 in your animate method)
+            if (this.gameStarted && !this.gameOver && !this.chaser && (currentTime - this.lastChaserTime) > 20000) {
+                // Check if there are available colors
+                if (this.availableColors.length === 0) {
+                    this.endGame();
+                    return;
+                }
+                
+                // Only spawn chaser if there are available colors
+                if (this.availableColors.length > 0) {
+                    this.chaser = this.createChaser();
+                    this.lastChaserTime = currentTime;
+                }
             }
 
             // Animate ground obstacles color changes
             this.groundObstacles.forEach(obstacle => {
                 // Change color periodically
-                const time = Date.now() * 0.001;
                 // Change color every 2 seconds
-                const newColorIndex = Math.floor(time * 0.5) % 4;
+                const newColorIndex = Math.floor(timeInSeconds * 0.5) % 4;
                 if (newColorIndex !== obstacle.currentColorIndex) {
                     obstacle.currentColorIndex = newColorIndex;
                     if (obstacle.children && obstacle.children[0] && obstacle.children[0].material) {
@@ -521,12 +539,6 @@ export default class Game {
             this.checkFloorTunnelCollisions();
             this.checkChaserCollision();
 
-            // Spawn chaser periodically
-            const currentTime = Date.now();
-            if (this.gameStarted && !this.gameOver && this.availableColors.length > 1 && !this.chaser && (currentTime - this.lastChaserTime) > 10000) {
-                this.chaser = this.createChaser();
-                this.lastChaserTime = currentTime;
-            }
         }
 
         this.renderer.render(this.scene, this.camera);
