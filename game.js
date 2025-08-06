@@ -88,7 +88,7 @@ class Game {
     }
 
     createBall() {
-        this.ball = new Ball(this.scene, this.ballColor);
+        this.ball = new Ball(this.scene, this.ballColor, this);
     }
 
     createBackgroundSphere() {
@@ -119,19 +119,31 @@ class Game {
 
         // Create obstacles further ahead of the ball's starting position
         for (let i = 0; i < 10; i++) {
-            this.rings.push(new Ring(this.scene, i * 20 + 30, this.colors));
+            this.rings.push(new Ring(this.scene, i * 20 + 30, this.colors, this));
             // Create walls at alternating positions
             if (i % 2 === 1) {
                 this.walls.push(new Wall(this.scene, i * 20 + 40, this.colors));
             }
             // Create ground obstacles at regular intervals
             if (i % 4 === 0) {
-                this.groundObstacles.push(new GroundObstacle(this.scene, i * 20 + 32, this.colors));
+                this.createGroundObstacle(i * 20 + 32);
             }
             // Create floor tunnels
             if (i > 0 && i % 3 === 0) {
                 this.floorTunnels.push(new FloorTunnel(this.scene, i * 20 + 50, this.colors));
             }
+        }
+    }
+
+    isPositionOccupiedByRing(zPosition) {
+        const ringZPositions = this.rings.map(ring => ring.position.z);
+        return ringZPositions.includes(zPosition);
+    }
+
+    createGroundObstacle(zPosition) {
+        if (!this.isPositionOccupiedByRing(zPosition)) {
+            const newObstacle = new GroundObstacle(this.scene, zPosition, this.colors);
+            this.groundObstacles.push(newObstacle);
         }
     }
 
@@ -150,191 +162,7 @@ class Game {
         return chaser;
     }
 
-    destroyBall() {
-        // Create particle explosion effect
-        const particleCount = 50;
-        const particleGeometry = new THREE.BufferGeometry();
-        const particlePositions = new Float32Array(particleCount * 3);
-        const particleColors = new Float32Array(particleCount * 3);
-        const particleSizes = new Float32Array(particleCount);
 
-        // Initialize particle positions and colors
-        for (let i = 0; i < particleCount; i++) {
-            // Position particles at the ball's location with some random spread
-            particlePositions[i * 3] = this.ball.position.x + (Math.random() - 0.5) * 2;
-            particlePositions[i * 3 + 1] = this.ball.position.y + (Math.random() - 0.5) * 2;
-            particlePositions[i * 3 + 2] = this.ball.position.z + (Math.random() - 0.5) * 2;
-
-            // Set particle colors to match the ball's color with some variation
-            const colorVariation = 0.2;
-            const r = ((this.ballColor >> 16) & 0xff) / 255 + (Math.random() - 0.5) * colorVariation;
-            const g = ((this.ballColor >> 8) & 0xff) / 255 + (Math.random() - 0.5) * colorVariation;
-            const b = (this.ballColor & 0xff) / 255 + (Math.random() - 0.5) * colorVariation;
-
-            particleColors[i * 3] = Math.min(1, Math.max(0, r));
-            particleColors[i * 3 + 1] = Math.min(1, Math.max(0, g));
-            particleColors[i * 3 + 2] = Math.min(1, Math.max(0, b));
-
-            // Random particle sizes
-            particleSizes[i] = Math.random() * 0.5 + 0.1;
-        }
-
-        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-        particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
-        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0.5,
-            vertexColors: true,
-            transparent: true,
-            opacity: 1.0,
-            sizeAttenuation: true
-        });
-
-        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-        this.scene.add(particleSystem);
-
-        // Hide the ball
-        this.ball.visible = false;
-
-        // Animate particles
-        const startTime = Date.now();
-        const duration = 1000; // 1 second
-
-        const animateParticles = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Update particle positions to move outward
-            const positions = particleGeometry.attributes.position.array;
-            for (let i = 0; i < particleCount; i++) {
-                // Move particles outward from center
-                const directionX = positions[i * 3] - this.ball.position.x;
-                const directionY = positions[i * 3 + 1] - this.ball.position.y;
-                const directionZ = positions[i * 3 + 2] - this.ball.position.z;
-
-                // Normalize and scale by progress
-                const length = Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
-                if (length > 0) {
-                    positions[i * 3] += (directionX / length) * progress * 2;
-                    positions[i * 3 + 1] += (directionY / length) * progress * 2;
-                    positions[i * 3 + 2] += (directionZ / length) * progress * 2;
-                }
-            }
-            particleGeometry.attributes.position.needsUpdate = true;
-
-            // Fade out particles
-            particleMaterial.opacity = 1 - progress;
-
-            // Continue animation or clean up
-            if (progress < 1) {
-                requestAnimationFrame(animateParticles);
-            } else {
-                // Remove particles and end game
-                this.scene.remove(particleSystem);
-                this.endGame();
-            }
-        }
-
-        // Start animation
-        animateParticles();
-    }
-
-    destroyRing(ring) {
-        // Create particle explosion effect
-        const particleCount = 30;
-        const particleGeometry = new THREE.BufferGeometry();
-        const particlePositions = new Float32Array(particleCount * 3);
-        const particleColors = new Float32Array(particleCount * 3);
-        const particleSizes = new Float32Array(particleCount);
-
-        // Get ring position
-        const ringPosition = ring.position.clone();
-
-        // Initialize particle positions and colors
-        for (let i = 0; i < particleCount; i++) {
-            // Position particles at the ring's location with some random spread
-            particlePositions[i * 3] = ringPosition.x + (Math.random() - 0.5) * 4;
-            particlePositions[i * 3 + 1] = ringPosition.y + (Math.random() - 0.5) * 4;
-            particlePositions[i * 3 + 2] = ringPosition.z + (Math.random() - 0.5) * 4;
-
-            // Set particle colors to match the ring's colors with some variation
-            // Get a random segment color from the ring
-            const segments = ring.children;
-            const randomSegment = segments[Math.floor(Math.random() * segments.length)];
-            const segmentColor = randomSegment.material.color.getHex();
-
-            const r = ((segmentColor >> 16) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-            const g = ((segmentColor >> 8) & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-            const b = (segmentColor & 0xff) / 255 + (Math.random() - 0.5) * 0.2;
-
-            particleColors[i * 3] = Math.min(1, Math.max(0, r));
-            particleColors[i * 3 + 1] = Math.min(1, Math.max(0, g));
-            particleColors[i * 3 + 2] = Math.min(1, Math.max(0, b));
-
-            // Random particle sizes
-            particleSizes[i] = Math.random() * 0.3 + 0.1;
-        }
-
-        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-        particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
-        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
-
-        const particleMaterial = new THREE.PointsMaterial({
-            size: 0.3,
-            vertexColors: true,
-            transparent: true,
-            opacity: 1.0,
-            sizeAttenuation: true
-        });
-
-        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-        this.scene.add(particleSystem);
-
-        // Hide the ring
-        ring.visible = false;
-
-        // Animate particles
-        const startTime = Date.now();
-        const duration = 800; // 0.8 second
-
-        const animateRingParticles = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Update particle positions to move outward
-            const positions = particleGeometry.attributes.position.array;
-            for (let i = 0; i < particleCount; i++) {
-                // Move particles outward from center
-                const directionX = positions[i * 3] - ringPosition.x;
-                const directionY = positions[i * 3 + 1] - ringPosition.y;
-                const directionZ = positions[i * 3 + 2] - ringPosition.z;
-
-                // Normalize and scale by progress
-                const length = Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
-                if (length > 0) {
-                    positions[i * 3] += (directionX / length) * progress * 1.5;
-                    positions[i * 3 + 1] += (directionY / length) * progress * 1.5;
-                    positions[i * 3 + 2] += (directionZ / length) * progress * 1.5;
-                }
-            }
-            particleGeometry.attributes.position.needsUpdate = true;
-
-            // Fade out particles
-            particleMaterial.opacity = 1 - progress;
-
-            // Continue animation or clean up
-            if (progress < 1) {
-                requestAnimationFrame(animateRingParticles);
-            } else {
-                // Remove particles
-                this.scene.remove(particleSystem);
-            }
-        }
-
-        // Start animation
-        animateRingParticles();
-    }
 
     destroyWall(wall) {
         // Create particle explosion effect
@@ -436,6 +264,9 @@ class Game {
         const ballPosition = this.ball.position;
 
         this.rings.forEach((ring, ringIndex) => {
+            if (!ring.game) {
+                ring.game = this;
+            }
             const ringPosition = ring.position;
             const distance = ballPosition.distanceTo(ringPosition);
 
@@ -458,17 +289,7 @@ class Game {
                 if (this.ballColor === segmentColor) {
                     ring.hasPassed = true;
                     // Use destruction effect instead of directly removing
-                    this.destroyRing(ring.mesh);
-                    // Remove ring after a short delay to allow animation to play
-                    setTimeout(() => {
-                        this.scene.remove(ring.mesh);
-                        const ringIndex = this.rings.indexOf(ring);
-                        if (ringIndex !== -1) {
-                            this.rings.splice(ringIndex, 1);
-                            const furthestZ = Math.min(...this.rings.map(r => r.position.z)) - 20;
-                            this.rings.push(new Ring(this.scene, furthestZ, this.colors));
-                        }
-                    }, 500); // Delay matches animation duration
+                    ring.destroy();
                     this.score += 10;
                     this.obstaclesPassed++;
                     this.updateAvailableColors();
@@ -477,7 +298,7 @@ class Game {
                     this.maxSpeed = Math.min(this.maxSpeed + 0.02, 1.2);
                 } else {
                     ring.hasPassed = true;
-                    this.destroyBall();
+                    this.ball.destroy();
                 }
             } else if (distance >= 5 || Math.abs(ballPosition.z - ringPosition.z) >= 1) {
                 ring.hasPassed = false;
@@ -485,68 +306,6 @@ class Game {
         });
     }
 
-    checkWallCollisions() {
-        const ballPosition = this.ball.position;
-
-        this.walls.forEach((wall, wallIndex) => {
-            const wallPosition = wall.position;
-            // Check if ball is at the same z-position as the wall
-            if (Math.abs(ballPosition.z - wallPosition.z) < 1) {
-                // Check if ball is passing through the wall horizontally (now wider)
-                if (Math.abs(ballPosition.x - wallPosition.x) < 6) {
-                    // Always require the ball color to match the bottom segment (lowest y)
-                    const bottomSegment = wall.children[0];
-                    const segmentColorIndex = bottomSegment.currentColorIndex !== undefined ?
-                        bottomSegment.currentColorIndex : bottomSegment.originalColorIndex;
-                    const segmentColor = this.colors[segmentColorIndex];
-                    // Check if colors match
-                    if (this.ballColor === segmentColor) {
-                        if (!wall.hasPassed) {
-                            wall.hasPassed = true;
-                            // Use destruction effect instead of directly removing
-                            this.destroyWall(wall.mesh);
-                            // Remove wall after a short delay to allow animation to play
-                            setTimeout(() => {
-                                const wallIndex = this.walls.indexOf(wall);
-                                if (wallIndex !== -1) {
-                                    this.scene.remove(wall.mesh);
-                                    this.walls.splice(wallIndex, 1);
-                                }
-                            }, 600); // Delay matches animation duration
-                            this.score += 15;
-                            this.updateScore();
-                            this.obstaclesPassed++;
-                            this.updateAvailableColors();
-                            this.changeBallColor();
-                        }
-                    } else {
-                        if (!wall.hasPassed) {
-                            wall.hasPassed = true;
-                            this.destroyBall();
-                        }
-                    }
-                }
-            }
-
-            // Remove walls that are too far behind and add new ones
-            if (wall.position.z > this.ball.position.z + 20) {
-                this.scene.remove(wall.mesh);
-                this.walls.splice(wallIndex, 1);
-
-                // Add new wall ahead
-                const furthestZ = Math.min(
-                    ...this.rings.map(r => r.position.z),
-                    ...this.walls.map(w => w.position.z)
-                ) - 20;
-                if (isFinite(furthestZ) && furthestZ < this.ball.position.z - 40) {
-                    this.walls.push(new Wall(this.scene, furthestZ, this.colors));
-                } else if (!isFinite(furthestZ)) {
-                    // If there are no rings or walls, create one relative to the ball
-                    this.walls.push(new Wall(this.scene, this.ball.position.z - 40, this.colors));
-                }
-            }
-        });
-    }
 
     checkGroundObstacleCollisions() {
         const ballPosition = this.ball.position;
@@ -556,7 +315,7 @@ class Game {
             // Check if ball is at the same z-position as the obstacle
             if (Math.abs(ballPosition.z - obstaclePosition.z) < 1) {
                 // Check if ball is within the obstacle's boundaries (8x8 square)
-                if (Math.abs(ballPosition.x - obstaclePosition.x) < 4 && Math.abs(ballPosition.y - obstaclePosition.y) < 4) {
+                if (Math.abs(ballPosition.x - obstaclePosition.x) < 4 && Math.abs(ballPosition.y - 0.5) < 1.25) {
                     // Check if colors match
                     if (this.ballColor === this.colors[obstacle.currentColorIndex]) {
                         if (!obstacle.hasPassed) {
@@ -571,7 +330,7 @@ class Game {
                         // If colors don't match, end the game
                         if (!obstacle.hasPassed) {
                             obstacle.hasPassed = true;
-                            this.destroyBall();
+                            this.ball.destroy();
                         }
                     }
                 }
@@ -590,10 +349,10 @@ class Game {
                 ];
                 const furthestZ = allZPositions.length > 0 ? Math.min(...allZPositions) - 20 : this.ball.position.z - 40;
                 if (isFinite(furthestZ) && furthestZ < this.ball.position.z - 40) {
-                    this.groundObstacles.push(new GroundObstacle(this.scene, furthestZ, this.colors));
+                    this.createGroundObstacle(furthestZ);
                 } else if (!isFinite(furthestZ)) {
                     // If there are no rings, walls, or obstacles, create one relative to the ball
-                    this.groundObstacles.push(new GroundObstacle(this.scene, this.ball.position.z - 40, this.colors));
+                    this.createGroundObstacle(this.ball.position.z - 40);
                 }
             }
         });
@@ -626,13 +385,13 @@ class Game {
                     } else {
                         if (!tunnel.hasPassed) {
                             tunnel.hasPassed = true;
-                            this.destroyBall();
+                            this.ball.destroy();
                         }
                     }
                 } else {
                     if (!tunnel.hasPassed) {
                         tunnel.hasPassed = true;
-                        this.destroyBall();
+                        this.ball.destroy();
                     }
                 }
             }
@@ -677,7 +436,7 @@ class Game {
 
             } else {
                 // Player does not have the color, game over
-                this.destroyBall();
+                this.ball.destroy();
             }
         }
     }
@@ -782,7 +541,7 @@ class Game {
 
             // Check collisions
             this.checkCollisions();
-            this.checkWallCollisions();
+            Wall.checkCollisions(this);
             this.checkGroundObstacleCollisions();
             this.checkFloorTunnelCollisions();
             this.checkChaserCollision();

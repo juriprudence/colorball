@@ -131,5 +131,15 @@ export default class GameController {
         this.groundObstacles = [];
     }
 
-    // ... (rest of class remains unchanged)
+    isPositionOccupiedByRing(zPosition) {
+        const ringZPositions = this.rings.map(ring => ring.position.z);
+        return ringZPositions.includes(zPosition);
+    }
+
+    createGroundObstacle(zPosition) {
+        if (!this.isPositionOccupiedByRing(zPosition)) {
+            const newObstacle = new GroundObstacle(this.scene, zPosition, this.colors);
+            this.groundObstacles.push(newObstacle);
+        }
+    }
 }
