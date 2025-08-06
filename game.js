@@ -335,6 +335,7 @@ class Game {
                     if (this.ballColor === this.colors[tunnel.colorIndex]) {
                         if (!tunnel.hasPassed) {
                             tunnel.hasPassed = true;
+                            tunnel.destroy();
                             this.score += 25;
                             this.updateScore();
                             this.obstaclesPassed++;
