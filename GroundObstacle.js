@@ -59,4 +59,20 @@ class GroundObstacle {
     get children() {
         return this.mesh.children;
     }
+    destroy() {
+        // Hide the obstacle
+        this.mesh.visible = false;
+
+        // Use the game's particle system to create an explosion
+        if (this.game && this.game.particleSystem) {
+            this.game.particleSystem.createExplosion(this.position, this.mesh.children[0].material.color, 40);
+        }
+
+        // Remove the obstacle from the scene after a short delay
+        setTimeout(() => {
+            if (this.game && this.game.scene) {
+                this.game.scene.remove(this.mesh);
+            }
+        }, 1000);
+    }
 }

@@ -11,6 +11,7 @@ class Game {
         this.groundObstacles = [];
         this.floorTunnels = [];
         this.chaser = null;
+        this.particleSystem = null;
         this.gameStarted = false;
         this.gameOver = false;
         this.ballColor = 0xff0000;
@@ -67,6 +68,9 @@ class Game {
 
         // Create ball
         this.createBall();
+
+        // Create particle system
+        this.particleSystem = new ParticleSystem(this.scene);
 
         // Create initial obstacles
         this.spawnInitialObstacles();
@@ -270,6 +274,7 @@ class Game {
                     ring.hasPassed = true;
                     // Use destruction effect instead of directly removing
                     ring.destroy();
+                    this.particleSystem.createExplosion(ring.position, this.ballColor, 20);
                     this.score += 10;
                     this.obstaclesPassed++;
                     this.updateAvailableColors();
@@ -278,6 +283,7 @@ class Game {
                     this.maxSpeed = Math.min(this.maxSpeed + 0.02, 1.2);
                 } else {
                     ring.hasPassed = true;
+                    this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
                     this.ball.destroy();
                 }
             } else if (distance >= 5 || Math.abs(ballPosition.z - ringPosition.z) >= 1) {
@@ -299,6 +305,7 @@ class Game {
                     if (this.ballColor === this.colors[obstacle.currentColorIndex]) {
                         if (!obstacle.hasPassed) {
                             obstacle.hasPassed = true;
+                            obstacle.destroy();
                             this.score += 20; // More points for ground obstacles
                             this.updateScore();
                             this.obstaclesPassed++;
@@ -309,6 +316,7 @@ class Game {
                         // If colors don't match, end the game
                         if (!obstacle.hasPassed) {
                             obstacle.hasPassed = true;
+                            this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
                             this.ball.destroy();
                         }
                     }
@@ -336,6 +344,7 @@ class Game {
                         if (!tunnel.hasPassed) {
                             tunnel.hasPassed = true;
                             tunnel.destroy();
+                            this.particleSystem.createExplosion(tunnel.position, this.ballColor, 30);
                             this.score += 25;
                             this.updateScore();
                             this.obstaclesPassed++;
@@ -345,6 +354,7 @@ class Game {
                     } else {
                         if (!tunnel.hasPassed) {
                             tunnel.hasPassed = true;
+                            this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
                             this.ball.destroy();
                         }
                     }
@@ -354,6 +364,7 @@ class Game {
                         ballPosition.x > tunnelPosition.x - tunnelWidth / 2 - 2 &&
                         ballPosition.x < tunnelPosition.x + tunnelWidth / 2 + 2) {
                         tunnel.hasPassed = true;
+                        this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
                         this.ball.destroy();
                     }
                 }
@@ -395,6 +406,7 @@ class Game {
 
             } else {
                 // Player does not have the color, game over
+                this.particleSystem.createExplosion(this.ball.position, 0xffffff, 50);
                 this.ball.destroy();
             }
         }
@@ -452,7 +464,12 @@ class Game {
             // Update obstacle spawning and removal
             this.updateObstacles();
 
-            // Update ground planes
+            // Update particle system
+            if (this.particleSystem) {
+                this.particleSystem.update();
+            }
+ 
+             // Update ground planes
             if (this.groundPlanes && this.groundPlanes.update) {
                 this.groundPlanes.update(this.ball.position);
             }
