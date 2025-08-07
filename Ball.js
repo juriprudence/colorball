@@ -1,37 +1,79 @@
+
+
 export default class Ball {
     constructor(scene, color, game) {
         this.game = game;
-        const ballGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-        const ballMaterial = new THREE.MeshLambertMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.2
-        });
-        this.mesh = new THREE.Mesh(ballGeometry, ballMaterial);
-        this.mesh.position.set(0, 0, 0);
-        this.mesh.castShadow = true;
-        scene.add(this.mesh);
+        this.scene = scene;
+        this._color = color;
+        this.mesh = null;
+
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            'models/player.glb',
+            (gltf) => {
+                this.mesh = gltf.scene;
+                this.mesh.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        if (child.material) {
+                            child.material.color.set(this._color);
+                            if (child.material.emissive) {
+                                child.material.emissive.set(this._color);
+                                child.material.emissiveIntensity = 0.2;
+                            }
+                        }
+                    }
+                });
+                this.mesh.position.set(0, 0, 0);
+                this.scene.add(this.mesh);
+            },
+            undefined,
+            (error) => {
+                console.error('An error happened while loading the model:', error);
+            }
+        );
     }
 
     get position() {
-        return this.mesh.position;
+        return this.mesh ? this.mesh.position : new THREE.Vector3();
     }
 
     get visible() {
-        return this.mesh.visible;
+        return this.mesh ? this.mesh.visible : false;
     }
 
     set visible(value) {
-        this.mesh.visible = value;
+        if (this.mesh) {
+            this.mesh.visible = value;
+        }
     }
 
     get color() {
-        return this.mesh.material.color.getHex();
+        if (this.mesh) {
+            // Assuming the first material is the one we want to get the color from
+            let material = null;
+            this.mesh.traverse((child) => {
+                if (child.isMesh && !material) {
+                    material = child.material;
+                }
+            });
+            return material ? material.color.getHex() : 0x000000;
+        }
+        return 0x000000;
     }
 
     set color(color) {
-        this.mesh.material.color.setHex(color);
-        this.mesh.material.emissive.setHex(color);
+        this._color = color;
+        if (this.mesh) {
+            this.mesh.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    child.material.color.setHex(color);
+                    if (child.material.emissive) {
+                        child.material.emissive.setHex(color);
+                    }
+                }
+            });
+        }
     }
     destroy() {
         // Hide the ball

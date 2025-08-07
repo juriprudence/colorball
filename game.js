@@ -441,6 +441,9 @@ export default class Game {
             // Move ball forward only when there's input
             if (this.ballSpeed > 0) {
                 this.ball.position.z -= this.ballSpeed;
+                if (this.ball.mesh) {
+                    this.ball.mesh.rotation.x-= 0.1;
+                }
                 this.ballSpeed *= 0.92; // Increased friction for faster stop
                 if (this.ballSpeed < 0.01) this.ballSpeed = 0; // Stop completely when very slow
             }
