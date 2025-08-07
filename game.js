@@ -5,12 +5,15 @@ import GroundOstacle from './GroundOstacle.js';
 import FloorTunnel from './FloorTunnel.js';
 import GroundPlanes from './GroundPlanes.js';
 import ParticleSystem from './ParticleSystem.js';
+import { BWall } from './bwall.js';
+
 export default class Game {
     constructor() {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
         this.ball = null;
+        this.bwall = null;
         this.backgroundSphere = null;
         this.groundPlanes = null;
         this.rings = [];
@@ -78,6 +81,8 @@ export default class Game {
 
         // Create particle system
         this.particleSystem = new ParticleSystem(this.scene);
+
+        this.bwall = new BWall(this.scene);
 
         // Create initial obstacles
         this.spawnInitialObstacles();
@@ -454,6 +459,10 @@ export default class Game {
             // Update particle system
             if (this.particleSystem) {
                 this.particleSystem.update();
+            }
+
+            if (this.bwall) {
+                this.bwall.update(this.camera.position);
             }
  
              // Update ground planes
